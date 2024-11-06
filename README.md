@@ -1,6 +1,6 @@
 Collaboration Plan
 
-Part: Transaction Management
+Part1: Transaction Management
 1. Implement the TransactionManager class, focusing on SSI logic.
 2. Develop the Transaction class to store transaction data.
 3. Implement command parsing in CommandParser and integrate it with TransactionManager.
@@ -13,3 +13,6 @@ Part 2: Data Management
 3. Implement the Variable class with versioning to support SSI.
 4. Handle read and write operations at the site level, considering replication.
 5. Implement site failure and recovery logic, ensuring proper variable availability.
+
+
+test cases: https://cs.nyu.edu/courses/fall24/CSCI-GA.2434-001/projectsampletests.serializablesnapshotisolation
