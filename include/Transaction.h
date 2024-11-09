@@ -21,18 +21,21 @@ public:
     TransactionStatus getStatus() const;
     void setStatus(TransactionStatus status);
     long getStartTime() const;
+    void setCommitTime(long time);  // Add this line
 
     void addReadVariable(const std::string& variableName);
     void addWriteVariable(const std::string& variableName, int value);
 
     const std::set<std::string>& getReadSet() const;
     const std::map<std::string, int>& getWriteSet() const;
+    long getCommitTime() const;
 
 private:
     std::string name;
     bool readOnly;
     TransactionStatus status;
     long startTime; // Use timestamp for SSI
+    long commitTime;
 
     std::set<std::string> readSet;
     std::map<std::string, int> writeSet;

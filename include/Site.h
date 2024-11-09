@@ -24,6 +24,9 @@ public:
 
     void fail();
     void recover();
+    bool hasVariable(const std::string& variableName) const;
+    bool hasCommittedWrite(const std::string& variableName, long startTime) const;   
+    void dump() const;  
 
 private:
     int id;
