@@ -17,6 +17,7 @@ public:
     std::string getName() const;
     int readValue(long timestamp) const;
     void writeValue(int value, long commitTime);
+    bool wasModifiedAfter(long timestamp) const;
 
 private:
     std::string name;

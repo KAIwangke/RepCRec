@@ -18,15 +18,16 @@ include_directories(
     ${SOURCE_DIR}
 )
 
-# Source files
+# Source files with correct paths
 set(SOURCES
     ${SOURCE_DIR}/main.cpp
-    ${SOURCE_DIR}/TransactionManager.cpp
-    ${SOURCE_DIR}/Transaction.cpp
-    ${SOURCE_DIR}/CommandParser.cpp
-    ${SOURCE_DIR}/DataManager.cpp
-    ${SOURCE_DIR}/Site.cpp
-    ${SOURCE_DIR}/Variable.cpp
+    ${SOURCE_DIR}/LockTable.cpp
+    ${SOURCE_DIR}/data/DataManager.cpp
+    ${SOURCE_DIR}/data/Site.cpp
+    ${SOURCE_DIR}/data/Variable.cpp
+    ${SOURCE_DIR}/transaction/Transaction.cpp
+    ${SOURCE_DIR}/transaction/TransactionManager.cpp
+    ${SOURCE_DIR}/transaction/CommandParser.cpp
 )
 
 # Add executable

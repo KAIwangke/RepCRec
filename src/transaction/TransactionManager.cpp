@@ -31,9 +31,11 @@ void TransactionManager::endTransaction(const std::string& transactionName) {
     }
 }
 
+void TransactionManager::dump() const {
+    dataManager->dump();
+}
+
 void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transaction) {
-    // Implement validation logic for SSI
-    // Commit or abort the transaction
     if (transaction->isReadOnly()) {
         transaction->setStatus(TransactionStatus::COMMITTED);
         std::cout << transaction->getName() << " committed (Read-Only).\n";
@@ -44,7 +46,11 @@ void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transact
     bool hasConflict = false;
     long startTime = transaction->getStartTime();
 
-    for (const auto& [variableName, value] : transaction->getWriteSet()) {
+    // Use C++11 compatible loop
+    const std::map<std::string, int>& writeSet = transaction->getWriteSet();
+    for (std::map<std::string, int>::const_iterator it = writeSet.begin(); 
+         it != writeSet.end(); ++it) {
+        const std::string& variableName = it->first;
         if (dataManager->hasCommittedWrite(variableName, startTime)) {
             hasConflict = true;
             break;
@@ -54,7 +60,6 @@ void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transact
     if (hasConflict) {
         abortTransaction(transaction);
     } else {
-        // Commit the transaction
         dataManager->commitTransaction(transaction);
         transaction->setStatus(TransactionStatus::COMMITTED);
         std::cout << transaction->getName() << " committed.\n";

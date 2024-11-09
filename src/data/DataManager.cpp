@@ -1,4 +1,5 @@
 #include "DataManager.h"
+#include <iostream>
 
 DataManager::DataManager() {
     initializeSites();
@@ -22,7 +23,6 @@ std::vector<std::shared_ptr<Site>> DataManager::getAllSites() {
     return siteList;
 }
 
-
 bool DataManager::hasCommittedWrite(const std::string& variableName, long startTime) {
     for (const auto& sitePair : sites) {
         auto site = sitePair.second;
@@ -34,7 +34,9 @@ bool DataManager::hasCommittedWrite(const std::string& variableName, long startT
 }
 
 void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction) {
-    for (const auto& [variableName, value] : transaction->getWriteSet()) {
+    for (const auto& write : transaction->getWriteSet()) {
+        const std::string& variableName = write.first;
+        int value = write.second;
         for (const auto& sitePair : sites) {
             auto site = sitePair.second;
             if (site->hasVariable(variableName)) {
@@ -51,6 +53,12 @@ int DataManager::read(const std::string& transactionName, const std::string& var
 
 void DataManager::write(const std::string& transactionName, const std::string& variableName, int value, long commitTime) {
     // Implement write logic considering replication and site status
+    for (auto& sitePair : sites) {
+        auto site = sitePair.second;
+        if (site->getStatus() == SiteStatus::UP) {
+            site->writeVariable(variableName, value, commitTime);
+        }
+    }
 }
 
 void DataManager::failSite(int siteId) {
@@ -60,13 +68,11 @@ void DataManager::failSite(int siteId) {
     }
 }
 
-
 void DataManager::dump() {
     for (const auto& sitePair : sites) {
         sitePair.second->dump();
     }
 }
-
 
 void DataManager::recoverSite(int siteId) {
     auto site = getSite(siteId);
@@ -74,4 +80,3 @@ void DataManager::recoverSite(int siteId) {
         site->recover();
     }
 }
-

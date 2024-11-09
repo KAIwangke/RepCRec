@@ -16,6 +16,7 @@ public:
     void read(const std::string& transactionName, const std::string& variableName);
     void write(const std::string& transactionName, const std::string& variableName, int value);
     void endTransaction(const std::string& transactionName);
+    void dump() const;
 
 private:
     std::map<std::string, std::shared_ptr<Transaction>> transactions;
