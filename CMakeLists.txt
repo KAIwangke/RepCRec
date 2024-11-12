@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Set the source and include directory variables
 set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 set(INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(TEST_DIR "${PROJECT_SOURCE_DIR}/test")
 
 # Include directories
 include_directories(
@@ -32,3 +33,24 @@ set(SOURCES
 
 # Add executable
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Find all test files in the test directory
+file(GLOB TEST_FILES "${TEST_DIR}/test*.txt")
+
+# Add custom target for running tests
+add_custom_target(test)
+
+# Create a test command for each test file
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME)
+    add_custom_command(
+        TARGET test
+        COMMAND ${CMAKE_COMMAND} -E echo "Running ${TEST_NAME}..."
+        COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}
+        COMMAND ${PROJECT_NAME} ${TEST_NAME}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endforeach()
+
+# Make test depend on building the executable
+add_dependencies(test ${PROJECT_NAME})
