@@ -1,0 +1,944 @@
+Directory Contents Dump - Tue Nov 12 03:45:43 UTC 2024
+Current Directory: /root/Database
+=========================================
+
+=== File: ./scan.sh ===
+----------------------------------------
+#!/bin/bash
+# Output file
+OUTPUT_FILE="all_contents.txt"
+
+# Clear or create output file
+> "$OUTPUT_FILE"
+
+# Add header with timestamp
+echo "Directory Contents Dump - $(date)" >> "$OUTPUT_FILE"
+echo "Current Directory: $(pwd)" >> "$OUTPUT_FILE"
+echo "=========================================" >> "$OUTPUT_FILE"
+echo >> "$OUTPUT_FILE"
+
+# Find all files while ignoring .git, build dir, and binary files
+find . -type f \
+    -not -path "*.git*" \
+    -not -path "*build*" \
+    -not -name "*.o" \
+    -not -name "*.exe" \
+    -not -name "*.a" \
+    -not -name "*.so" \
+    -not -name "*.pyc" \
+    -not -name "*.class" \
+    -not -name "*.jar" \
+    -not -name "*.war" \
+    -not -name "*.dll" \
+    -not -name "*.bin" \
+    -print0 | while IFS= read -r -d '' file; do
+    
+    # Print file header
+    echo "=== File: $file ===" >> "$OUTPUT_FILE"
+    echo "----------------------------------------" >> "$OUTPUT_FILE"
+    
+    # Try to cat the file contents, redirect errors to /dev/null
+    cat "$file" 2>/dev/null >> "$OUTPUT_FILE"
+    
+    # Add spacer between files
+    echo -e "\n\n" >> "$OUTPUT_FILE"
+done
+
+echo "Contents have been saved to $OUTPUT_FILE"
+
+
+=== File: ./CMakeLists.txt ===
+----------------------------------------
+# Minimum CMake version required
+cmake_minimum_required(VERSION 3.10)
+
+# Project Name
+project(RepCRec)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Set the source and include directory variables
+set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
+set(INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+
+# Include directories
+include_directories(
+    ${INCLUDE_DIR}
+    ${SOURCE_DIR}
+)
+
+# Source files with correct paths
+set(SOURCES
+    ${SOURCE_DIR}/main.cpp
+    ${SOURCE_DIR}/LockTable.cpp
+    ${SOURCE_DIR}/data/DataManager.cpp
+    ${SOURCE_DIR}/data/Site.cpp
+    ${SOURCE_DIR}/data/Variable.cpp
+    ${SOURCE_DIR}/transaction/Transaction.cpp
+    ${SOURCE_DIR}/transaction/TransactionManager.cpp
+    ${SOURCE_DIR}/transaction/CommandParser.cpp
+)
+
+# Add executable
+add_executable(${PROJECT_NAME} ${SOURCES})
+
+
+=== File: ./README.md ===
+----------------------------------------
+Collaboration Plan
+
+Part1: Transaction Management
+1. Implement the TransactionManager class, focusing on SSI logic.
+2. Develop the Transaction class to store transaction data.
+3. Implement command parsing in CommandParser and integrate it with TransactionManager.
+4. Handle transaction lifecycle: begin, read, write, validate, commit, abort.
+5. Implement conflict detection and resolution according to SSI rules.
+
+Part 2: Data Management
+1. Implement the DataManager class to manage sites.
+2. Develop the Site class to handle variables, failures, and recoveries.
+3. Implement the Variable class with versioning to support SSI.
+4. Handle read and write operations at the site level, considering replication.
+5. Implement site failure and recovery logic, ensuring proper variable availability.
+
+
+test cases: https://cs.nyu.edu/courses/fall24/CSCI-GA.2434-001/projectsampletests.serializablesnapshotisolation
+
+
+
+=== File: ./include/CommandParser.h ===
+----------------------------------------
+#ifndef COMMAND_PARSER_H
+#define COMMAND_PARSER_H
+
+#include <string>
+#include <vector>
+
+class TransactionManager;
+
+class CommandParser {
+public:
+    CommandParser(TransactionManager& tm);
+    void parseCommand(const std::string& command);
+
+private:
+    TransactionManager& transactionManager;
+    std::vector<std::string> tokenize(const std::string& str, char delimiter);
+};
+
+#endif // COMMAND_PARSER_H
+
+
+
+=== File: ./include/DataManager.h ===
+----------------------------------------
+#ifndef DATA_MANAGER_H
+#define DATA_MANAGER_H
+
+#include <string>
+#include <map>
+#include <vector>
+#include <memory>
+#include "Site.h"
+#include "Transaction.h"  // Added this include
+
+class DataManager {
+public:
+    DataManager();
+    void initializeSites();
+
+    std::shared_ptr<Site> getSite(int siteId);
+    std::vector<std::shared_ptr<Site>> getAllSites();
+
+    // Added these new method declarations
+    bool hasCommittedWrite(const std::string& variableName, long startTime);
+    void commitTransaction(std::shared_ptr<Transaction> transaction);
+    void dump();
+
+    // Methods to route read/write requests to sites
+    int read(const std::string& transactionName, const std::string& variableName, long timestamp);
+    void write(const std::string& transactionName, const std::string& variableName, int value, long commitTime);
+
+    // Methods to handle site failures and recoveries
+    void failSite(int siteId);
+    void recoverSite(int siteId);
+
+private:
+    std::map<int, std::shared_ptr<Site>> sites;
+};
+
+#endif // DATA_MANAGER_H
+
+
+=== File: ./include/Lock.h ===
+----------------------------------------
+#ifndef LOCK_H
+#define LOCK_H
+
+#include <iostream>
+#include <set>
+
+using namespace std;
+
+#define TOTAL_VARIABLES 20
+
+enum Lock_type
+{
+    READ_LOCK,
+    WRITE_LOCK,
+    NO_LOCK
+};
+
+class Lock
+{
+public:
+    Lock_type type;
+    // TODO: Modify the DS
+    set<int> transactions;
+    Lock(Lock_type type, set<int> transactions);
+};
+
+#endif
+
+
+=== File: ./include/Transaction.h ===
+----------------------------------------
+#ifndef TRANSACTION_H
+#define TRANSACTION_H
+
+#include <string>
+#include <set>
+#include <map>
+#include <chrono>
+
+enum class TransactionStatus {
+    ACTIVE,
+    COMMITTED,
+    ABORTED
+};
+
+class Transaction {
+public:
+    Transaction(const std::string& name, bool isReadOnly);
+
+    std::string getName() const;
+    bool isReadOnly() const;
+    TransactionStatus getStatus() const;
+    void setStatus(TransactionStatus status);
+    long getStartTime() const;
+    void setCommitTime(long time);  // Add this line
+
+    void addReadVariable(const std::string& variableName);
+    void addWriteVariable(const std::string& variableName, int value);
+
+    const std::set<std::string>& getReadSet() const;
+    const std::map<std::string, int>& getWriteSet() const;
+    long getCommitTime() const;
+
+private:
+    std::string name;
+    bool readOnly;
+    TransactionStatus status;
+    long startTime; // Use timestamp for SSI
+    long commitTime;
+
+    std::set<std::string> readSet;
+    std::map<std::string, int> writeSet;
+};
+
+#endif // TRANSACTION_H
+
+
+
+=== File: ./include/Site.h ===
+----------------------------------------
+#ifndef SITE_H
+#define SITE_H
+
+#include <string>
+#include <map>
+#include <mutex>
+#include "Variable.h"
+
+enum class SiteStatus {
+    UP,
+    DOWN,
+    RECOVERING
+};
+
+class Site {
+public:
+    Site(int id);
+    int getId() const;
+    SiteStatus getStatus() const;
+    void setStatus(SiteStatus status);
+
+    int readVariable(const std::string& variableName, long timestamp);
+    void writeVariable(const std::string& variableName, int value, long commitTime);
+
+    void fail();
+    void recover();
+    bool hasVariable(const std::string& variableName) const;
+    bool hasCommittedWrite(const std::string& variableName, long startTime) const;   
+    void dump() const;  
+
+private:
+    int id;
+    SiteStatus status;
+    std::mutex siteMutex;
+    std::map<std::string, Variable> variables;
+
+    void initializeVariables();
+};
+
+#endif // SITE_H
+
+
+
+=== File: ./include/Variable.h ===
+----------------------------------------
+#ifndef VARIABLE_H
+#define VARIABLE_H
+
+#include <string>
+#include <vector>
+
+struct Version {
+    int value;
+    long commitTime;
+};
+
+class Variable {
+public:
+    Variable(); // Default constructor
+    Variable(const std::string& name, int initialValue);
+
+    std::string getName() const;
+    int readValue(long timestamp) const;
+    void writeValue(int value, long commitTime);
+    bool wasModifiedAfter(long timestamp) const;
+
+private:
+    std::string name;
+    std::vector<Version> versions;
+};
+
+#endif // VARIABLE_H
+
+
+
+=== File: ./include/TransactionManager.h ===
+----------------------------------------
+#ifndef TRANSACTION_MANAGER_H
+#define TRANSACTION_MANAGER_H
+
+#include <string>
+#include <map>
+#include <memory>
+#include "Transaction.h"
+#include "DataManager.h"
+
+class TransactionManager {
+public:
+    TransactionManager(std::shared_ptr<DataManager> dm);
+    void processCommand(const std::string& command);
+
+    void beginTransaction(const std::string& transactionName, bool isReadOnly);
+    void read(const std::string& transactionName, const std::string& variableName);
+    void write(const std::string& transactionName, const std::string& variableName, int value);
+    void endTransaction(const std::string& transactionName);
+    void dump() const;
+
+private:
+    std::map<std::string, std::shared_ptr<Transaction>> transactions;
+    std::shared_ptr<DataManager> dataManager; // Interface to Data Managers
+
+    // Helper methods
+    void validateAndCommit(std::shared_ptr<Transaction> transaction);
+    void abortTransaction(std::shared_ptr<Transaction> transaction);
+};
+
+#endif // TRANSACTION_MANAGER_H
+
+
+
+=== File: ./test/test1.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x1,101) 
+W(T2,x2,202)
+W(T1,x2,102) 
+W(T2,x1,201)
+end(T2)
+end(T1)
+dump()
+
+
+=== File: ./all_contents.txt ===
+----------------------------------------
+
+
+
+=== File: ./src/data/DataManager.cpp ===
+----------------------------------------
+#include "DataManager.h"
+#include <iostream>
+using namespace std;
+
+
+DataManager::DataManager() {
+    initializeSites();
+}
+
+void DataManager::initializeSites() {
+    for (int i = 1; i <= 10; ++i) {
+        sites[i] = std::make_shared<Site>(i);
+    }
+}
+
+std::shared_ptr<Site> DataManager::getSite(int siteId) {
+    return sites[siteId];
+}
+
+std::vector<std::shared_ptr<Site>> DataManager::getAllSites() {
+    std::vector<std::shared_ptr<Site>> siteList;
+    for (auto& pair : sites) {
+        siteList.push_back(pair.second);
+    }
+    return siteList;
+}
+
+bool DataManager::hasCommittedWrite(const std::string& variableName, long startTime) {
+    for (const auto& sitePair : sites) {
+        auto site = sitePair.second;
+        if (site->hasCommittedWrite(variableName, startTime)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction) {
+    for (const auto& write : transaction->getWriteSet()) {
+        const std::string& variableName = write.first;
+        int value = write.second;
+        for (const auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->hasVariable(variableName)) {
+                site->writeVariable(variableName, value, transaction->getCommitTime());
+            }
+        }
+    }
+}
+
+int DataManager::read(const std::string& transactionName, const std::string& variableName, long timestamp) {
+    // Implement read logic considering replication and site status
+    return 0; // Placeholder return value
+}
+
+void DataManager::write(const std::string& transactionName, const std::string& variableName, int value, long commitTime) {
+    // Implement write logic considering replication and site status
+    for (auto& sitePair : sites) {
+        auto site = sitePair.second;
+        if (site->getStatus() == SiteStatus::UP) {
+            site->writeVariable(variableName, value, commitTime);
+        }
+    }
+}
+
+void DataManager::failSite(int siteId) {
+    auto site = getSite(siteId);
+    if (site) {
+        site->fail();
+    }
+}
+
+void DataManager::dump() {
+    for (const auto& sitePair : sites) {
+        sitePair.second->dump();
+    }
+}
+
+void DataManager::recoverSite(int siteId) {
+    auto site = getSite(siteId);
+    if (site) {
+        site->recover();
+    }
+}
+
+
+=== File: ./src/data/Site.cpp ===
+----------------------------------------
+#include "Site.h"
+#include <iostream>
+#include <chrono>
+
+Site::Site(int id) : id(id), status(SiteStatus::UP) {
+    initializeVariables();
+}
+
+int Site::getId() const {
+    return id;
+}
+
+SiteStatus Site::getStatus() const {
+    return status;
+}
+
+void Site::setStatus(SiteStatus status) {
+    this->status = status;
+}
+
+// Fixed: Added const qualifier to match the header declaration
+bool Site::hasCommittedWrite(const std::string& variableName, long startTime) const {  
+    auto it = variables.find(variableName);
+    if (it != variables.end()) {
+        return it->second.wasModifiedAfter(startTime);
+    }
+    return false;
+}
+
+bool Site::hasVariable(const std::string& variableName) const {
+    return variables.find(variableName) != variables.end();
+}
+
+int Site::readVariable(const std::string& variableName, long timestamp) {
+    std::lock_guard<std::mutex> lock(siteMutex);
+    return variables[variableName].readValue(timestamp);
+}
+
+void Site::writeVariable(const std::string& variableName, int value, long commitTime) {
+    std::lock_guard<std::mutex> lock(siteMutex);
+    variables[variableName].writeValue(value, commitTime);
+}
+
+void Site::fail() {
+    std::lock_guard<std::mutex> lock(siteMutex);
+    status = SiteStatus::DOWN;
+}
+
+void Site::dump() const {
+    std::cout << "=== Site " << id << " ===\n";
+    if (status == SiteStatus::DOWN) {
+        std::cout << "This site is down.\n";
+        return;
+    }
+    
+    for (std::map<std::string, Variable>::const_iterator it = variables.begin(); 
+         it != variables.end(); ++it) {
+        const std::string& varName = it->first;
+        const Variable& variable = it->second;
+        int value = variable.readValue(std::chrono::system_clock::now().time_since_epoch().count());
+        std::cout << varName << ": " << value << " at site " << id << "\n";
+    }
+}
+
+void Site::recover() {
+    std::lock_guard<std::mutex> lock(siteMutex);
+    status = SiteStatus::RECOVERING;
+}
+
+void Site::initializeVariables() {
+    // Initialize variables based on site ID and replication rules
+}
+
+
+=== File: ./src/data/Variable.cpp ===
+----------------------------------------
+#include "Variable.h"
+
+
+Variable::Variable()
+    : name(""), versions({{0, 0}}) {} // Initialize members appropriately
+    
+Variable::Variable(const std::string& name, int initialValue)
+    : name(name) {
+    versions.push_back({initialValue, 0}); // Initial version at time 0
+}
+
+std::string Variable::getName() const {
+    return name;
+}
+
+int Variable::readValue(long timestamp) const {
+    // Implement version selection based on SSI
+    for (auto it = versions.rbegin(); it != versions.rend(); ++it) {
+        if (it->commitTime <= timestamp) {
+            return it->value;
+        }
+    }
+    return versions.front().value; // Return initial value if no versions are valid
+}
+
+bool Variable::wasModifiedAfter(long timestamp) const {
+    for (const auto& version : versions) {
+        if (version.commitTime > timestamp) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void Variable::writeValue(int value, long commitTime) {
+    versions.push_back({value, commitTime});
+}
+
+
+
+
+=== File: ./src/transaction/TransactionManager.cpp ===
+----------------------------------------
+#include "TransactionManager.h"
+#include "CommandParser.h"
+#include <iostream>
+#include <chrono>
+#include <string>
+#include <regex>
+
+using namespace std;
+
+TransactionManager::TransactionManager(shared_ptr<DataManager> dm)
+    : dataManager(dm) {}
+
+namespace {
+    // Helper function to extract variable index from name (e.g., "x3" -> 3)
+    int getVarIndex(const string& varName) {
+        regex rx("x(\\d+)");
+        smatch match;
+        if (regex_match(varName, match, rx)) {
+            return stoi(match[1]);
+        }
+        return -1;
+    }
+}
+
+void TransactionManager::beginTransaction(const string& transactionName, bool isReadOnly) {
+    auto transaction = make_shared<Transaction>(transactionName, isReadOnly);
+    transactions[transactionName] = transaction;
+    cout << "Transaction " << transactionName << " started" 
+         << (isReadOnly ? " (Read-Only)" : "") << ".\n";
+}
+
+void TransactionManager::read(const string& transactionName, const string& variableName) {
+    auto it = transactions.find(transactionName);
+    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE) {
+        cout << "Transaction " << transactionName << " is not active.\n";
+        return;
+    }
+
+    auto transaction = it->second;
+    int varIndex = getVarIndex(variableName);
+    if (varIndex < 1 || varIndex > 20) {
+        cout << "Invalid variable name: " << variableName << endl;
+        abortTransaction(transaction);
+        return;
+    }
+
+    try {
+        // Read value based on transaction type
+        int value;
+        if (transaction->isReadOnly()) {
+            // Read-only transactions always read from their snapshot at start time
+            value = dataManager->read(transactionName, variableName, transaction->getStartTime());
+        } else {
+            // Read-write transactions read latest committed value before their start time
+            value = dataManager->read(transactionName, variableName, 
+                                    chrono::system_clock::now().time_since_epoch().count());
+            // Record read for validation
+            transaction->addReadVariable(variableName);
+        }
+        cout << variableName << ": " << value << endl;
+    }
+    catch (const exception& e) {
+        cout << "Read failed for transaction " << transactionName 
+             << " on variable " << variableName << endl;
+        abortTransaction(transaction);
+    }
+}
+
+void TransactionManager::write(const string& transactionName, const string& variableName, int value) {
+    auto it = transactions.find(transactionName);
+    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE) {
+        cout << "Transaction " << transactionName << " is not active.\n";
+        return;
+    }
+
+    auto transaction = it->second;
+    if (transaction->isReadOnly()) {
+        cout << "Read-only transaction " << transactionName << " cannot perform writes.\n";
+        abortTransaction(transaction);
+        return;
+    }
+
+    int varIndex = getVarIndex(variableName);
+    if (varIndex < 1 || varIndex > 20) {
+        cout << "Invalid variable name: " << variableName << endl;
+        abortTransaction(transaction);
+        return;
+    }
+
+    // For SSI, buffer writes until commit time
+    transaction->addWriteVariable(variableName, value);
+    cout << "Write of " << value << " to " << variableName 
+         << " buffered for transaction " << transactionName << endl;
+}
+
+void TransactionManager::endTransaction(const string& transactionName) {
+    auto it = transactions.find(transactionName);
+    if (it == transactions.end()) {
+        cout << "Transaction " << transactionName << " not found.\n";
+        return;
+    }
+
+    auto transaction = it->second;
+    if (transaction->getStatus() != TransactionStatus::ACTIVE) {
+        cout << "Transaction " << transactionName << " is not active.\n";
+        return;
+    }
+
+    // Validate and commit/abort the transaction
+    validateAndCommit(transaction);
+    
+    // Clean up transaction entry
+    transactions.erase(it);
+}
+
+void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction) {
+    if (transaction->isReadOnly()) {
+        transaction->setStatus(TransactionStatus::COMMITTED);
+        cout << transaction->getName() << " committed (Read-Only).\n";
+        return;
+    }
+
+    // SSI Validation
+    bool hasConflict = false;
+    const auto& writeSet = transaction->getWriteSet();
+    const auto& readSet = transaction->getReadSet();
+    long startTime = transaction->getStartTime();
+
+    // Check write-write conflicts (first-committer wins)
+    for (const auto& [variableName, value] : writeSet) {
+        if (dataManager->hasCommittedWrite(variableName, startTime)) {
+            cout << "Write-write conflict detected on " << variableName 
+                 << " for transaction " << transaction->getName() << endl;
+            hasConflict = true;
+            break;
+        }
+    }
+
+    // TODO: Implement check for consecutive read-write conflicts in serialization graph
+    // This would involve tracking read dependencies between transactions
+    // and detecting cycles with alternating read-write edges
+
+    if (hasConflict) {
+        abortTransaction(transaction);
+    } else {
+        // Set commit timestamp and commit the transaction
+        long commitTime = chrono::system_clock::now().time_since_epoch().count();
+        transaction->setCommitTime(commitTime);
+        
+        // Write all buffered writes to database
+        dataManager->commitTransaction(transaction);
+        
+        transaction->setStatus(TransactionStatus::COMMITTED);
+        cout << transaction->getName() << " committed.\n";
+    }
+}
+
+void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction) {
+    transaction->setStatus(TransactionStatus::ABORTED);
+    cout << "Transaction " << transaction->getName() << " aborted.\n";
+}
+
+void TransactionManager::dump() const {
+    dataManager->dump();
+}
+
+
+=== File: ./src/transaction/Transaction.cpp ===
+----------------------------------------
+#include "Transaction.h"
+
+#include <chrono>
+
+Transaction::Transaction(const std::string& name, bool isReadOnly)
+    : name(name),
+      readOnly(isReadOnly),
+      status(TransactionStatus::ACTIVE),
+      startTime(std::chrono::system_clock::now().time_since_epoch().count()),
+      commitTime(0) {  // Initialize commitTime
+}
+
+std::string Transaction::getName() const { return name; }
+
+bool Transaction::isReadOnly() const { return readOnly; }
+
+TransactionStatus Transaction::getStatus() const { return status; }
+
+void Transaction::setStatus(TransactionStatus newStatus) {
+    status = newStatus;
+    if (newStatus == TransactionStatus::COMMITTED) {
+        commitTime = std::chrono::system_clock::now().time_since_epoch().count();
+    }
+}
+
+long Transaction::getStartTime() const { return startTime; }
+
+void Transaction::addReadVariable(const std::string& variableName) { readSet.insert(variableName); }
+
+void Transaction::addWriteVariable(const std::string& variableName, int value) { writeSet[variableName] = value; }
+
+const std::set<std::string>& Transaction::getReadSet() const { return readSet; }
+
+const std::map<std::string, int>& Transaction::getWriteSet() const { return writeSet; }
+
+// In src/transaction/Transaction.cpp, add these implementations:
+void Transaction::setCommitTime(long time) { commitTime = time; }
+
+long Transaction::getCommitTime() const { return commitTime; }
+
+
+=== File: ./src/transaction/CommandParser.cpp ===
+----------------------------------------
+#include "CommandParser.h"
+#include "TransactionManager.h"
+#include <sstream>
+#include <iostream>
+#include <algorithm>
+#include <string>
+
+using namespace std;
+
+CommandParser::CommandParser(TransactionManager& tm)
+    : transactionManager(tm) {}
+
+// Helper function to trim whitespace
+string trim(const string& str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    if (first == string::npos) return "";
+    size_t last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, (last - first + 1));
+}
+
+// Extract single argument from command like "begin(T1)" -> "T1"
+string extractArgument(const string& command) {
+    size_t start = command.find('(');
+    size_t end = command.find(')');
+    if (start == string::npos || end == string::npos || start >= end) {
+        return "";
+    }
+    return trim(command.substr(start + 1, end - start - 1));
+}
+
+// Extract multiple arguments from command like "W(T1,x1,101)" -> ["T1", "x1", "101"]
+vector<string> extractArguments(const string& command) {
+    vector<string> args;
+    size_t start = command.find('(');
+    size_t end = command.find(')');
+    
+    if (start == string::npos || end == string::npos || start >= end) {
+        return args;
+    }
+    
+    string argsStr = command.substr(start + 1, end - start - 1);
+    stringstream ss(argsStr);
+    string arg;
+    
+    while (getline(ss, arg, ',')) {
+        args.push_back(trim(arg));
+    }
+    
+    return args;
+}
+
+void CommandParser::parseCommand(const string& command) {
+    string trimmedCommand = trim(command);
+
+    if (trimmedCommand.empty() || trimmedCommand[0] == '/') return;
+
+    if (trimmedCommand.substr(0, 6) == "begin(") {
+        string txnName = extractArgument(trimmedCommand);
+        transactionManager.beginTransaction(txnName, false);
+    } else if (trimmedCommand.substr(0, 8) == "beginRO(") {
+        string txnName = extractArgument(trimmedCommand);
+        transactionManager.beginTransaction(txnName, true);
+    } else if (trimmedCommand.substr(0, 2) == "W(") {
+        vector<string> args = extractArguments(trimmedCommand);
+        if (args.size() >= 3) {
+            transactionManager.write(args[0], args[1], stoi(args[2]));
+        }
+    } else if (trimmedCommand.substr(0, 2) == "R(") {
+        vector<string> args = extractArguments(trimmedCommand);
+        if (args.size() >= 2) {
+            transactionManager.read(args[0], args[1]);
+        }
+    } else if (trimmedCommand.substr(0, 4) == "end(") {
+        string txnName = extractArgument(trimmedCommand);
+        transactionManager.endTransaction(txnName);
+    } else if (trimmedCommand == "dump()") {
+        // Access dataManager through transactionManager
+        transactionManager.dump();
+    } else {
+        cerr << "Unknown command: " << command << endl;
+    }    
+}
+vector<string> CommandParser::tokenize(const string& str, char delimiter) {
+    vector<string> tokens;
+    stringstream ss(str);
+    string token;
+    while (getline(ss, token, delimiter)) {
+        tokens.push_back(trim(token));
+    }
+    return tokens;
+}
+
+
+=== File: ./src/LockTable.cpp ===
+----------------------------------------
+#include "Lock.h"
+
+Lock::Lock(Lock_type type, set<int> transactions)
+{
+    this->type = type;
+    this->transactions = transactions;
+}
+
+
+=== File: ./src/main.cpp ===
+----------------------------------------
+#include <iostream>
+#include <fstream>
+#include <memory>
+#include <string>
+#include "TransactionManager.h"
+#include "DataManager.h"
+#include "CommandParser.h"
+
+int main() {
+    auto dataManager = std::make_shared<DataManager>();
+    TransactionManager transactionManager(dataManager);
+    CommandParser parser(transactionManager);
+
+    std::ifstream inputFile("test1.txt");
+    if (!inputFile.is_open()) {
+        std::cerr << "Failed to open input file 'test1.txt'.\n";
+        return 1;
+    }
+
+    std::string command;
+    while (std::getline(inputFile, command)) {
+        // Skip empty lines or comments
+        if (command.empty() || command[0] == '/') continue;
+
+        parser.parseCommand(command);
+    }
+
+    inputFile.close();
+    return 0;
+}
+
+
+

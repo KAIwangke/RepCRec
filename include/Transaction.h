@@ -21,7 +21,7 @@ public:
     TransactionStatus getStatus() const;
     void setStatus(TransactionStatus status);
     long getStartTime() const;
-    void setCommitTime(long time);  // Add this line
+    void setCommitTime(long time);  
 
     void addReadVariable(const std::string& variableName);
     void addWriteVariable(const std::string& variableName, int value);

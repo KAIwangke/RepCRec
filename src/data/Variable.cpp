@@ -14,13 +14,20 @@ std::string Variable::getName() const {
 }
 
 int Variable::readValue(long timestamp) const {
-    // Implement version selection based on SSI
+    // Return initial value if no versions exist
+    if (versions.empty()) {
+        return stoi(name.substr(1)) * 10;
+    }
+    
+    // Return value of latest version before or at timestamp
     for (auto it = versions.rbegin(); it != versions.rend(); ++it) {
         if (it->commitTime <= timestamp) {
             return it->value;
         }
     }
-    return versions.front().value; // Return initial value if no versions are valid
+    
+    // If no appropriate version found, return initial value
+    return stoi(name.substr(1)) * 10;
 }
 
 bool Variable::wasModifiedAfter(long timestamp) const {

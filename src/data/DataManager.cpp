@@ -1,5 +1,7 @@
 #include "DataManager.h"
 #include <iostream>
+using namespace std;
+
 
 DataManager::DataManager() {
     initializeSites();
@@ -46,15 +48,42 @@ void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction) {
     }
 }
 
-int DataManager::read(const std::string& transactionName, const std::string& variableName, long timestamp) {
-    // Implement read logic considering replication and site status
-    return 0; // Placeholder return value
+int DataManager::read(const string& transactionName, const string& variableName, long timestamp) {
+    int varIndex = stoi(variableName.substr(1));
+    int initialValue = varIndex * 10;  // Initial value for any variable xi is 10*i
+    
+    if (varIndex % 2 == 1) {  // Odd variables
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
+        if (site->getStatus() == SiteStatus::UP) {
+            return site->readVariable(variableName, timestamp);
+        }
+        throw runtime_error("Site " + to_string(siteId) + " is down");
+    } else {  // Even variables - read from any up site
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP) {
+                return site->readVariable(variableName, timestamp);
+            }
+        }
+        throw runtime_error("No available site to read " + variableName);
+    }
+    return initialValue;  // Should never reach here but prevents warning
 }
 
-void DataManager::write(const std::string& transactionName, const std::string& variableName, int value, long commitTime) {
-    // Implement write logic considering replication and site status
-    for (auto& sitePair : sites) {
-        auto site = sitePair.second;
+void DataManager::write(const string& transactionName, const string& variableName, int value, long commitTime) {
+    int varIndex = stoi(variableName.substr(1));
+    
+    if (varIndex % 2 == 0) {  // Even variables - write to all up sites
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP) {
+                site->writeVariable(variableName, value, commitTime);
+            }
+        }
+    } else {  // Odd variables - write to specific site
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
         if (site->getStatus() == SiteStatus::UP) {
             site->writeVariable(variableName, value, commitTime);
         }
