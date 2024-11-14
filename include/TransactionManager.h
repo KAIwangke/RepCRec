@@ -7,16 +7,19 @@
 #include "Transaction.h"
 #include "DataManager.h"
 
-class TransactionManager {
+class TransactionManager
+{
 public:
     TransactionManager(std::shared_ptr<DataManager> dm);
-    void processCommand(const std::string& command);
+    void processCommand(const std::string &command);
 
-    void beginTransaction(const std::string& transactionName, bool isReadOnly);
-    void read(const std::string& transactionName, const std::string& variableName);
-    void write(const std::string& transactionName, const std::string& variableName, int value);
-    void endTransaction(const std::string& transactionName);
+    void beginTransaction(const std::string &transactionName, bool isReadOnly);
+    void read(const std::string &transactionName, const std::string &variableName);
+    void write(const std::string &transactionName, const std::string &variableName, int value);
+    void endTransaction(const std::string &transactionName);
     void dump() const;
+    void failSite(int siteId);
+    void recoverSite(int siteId);
 
 private:
     std::map<std::string, std::shared_ptr<Transaction>> transactions;
