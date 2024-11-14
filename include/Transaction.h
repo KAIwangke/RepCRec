@@ -32,6 +32,8 @@ public:
     const std::set<std::string> &getReadSet() const;
     const std::map<std::string, int> &getWriteSet() const;
     long getCommitTime() const;
+    void addSiteWritten(int siteId);
+    const std::unordered_set<int> &getSitesWrittenTo() const;
 
 private:
     std::string name;

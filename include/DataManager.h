@@ -24,7 +24,8 @@ public:
 
     // Methods to route read/write requests to sites
     int read(const std::string &transactionName, const std::string &variableName, long timestamp);
-    void write(const std::string &transactionName, const std::string &variableName, int value, long commitTime);
+    void write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime);
+    // Pass ptr to track transaction sites
 
     // Methods to handle site failures and recoveries
     void failSite(int siteId);
