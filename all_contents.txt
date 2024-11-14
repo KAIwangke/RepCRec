@@ -1,4 +1,4 @@
-Directory Contents Dump - Tue Nov 12 03:45:43 UTC 2024
+Directory Contents Dump - Wed Nov 13 21:18:59 UTC 2024
 Current Directory: /root/Database
 =========================================
 
@@ -62,6 +62,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Set the source and include directory variables
 set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 set(INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+set(TEST_DIR "${PROJECT_SOURCE_DIR}/test")
 
 # Include directories
 include_directories(
@@ -83,6 +84,27 @@ set(SOURCES
 
 # Add executable
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Find all test files in the test directory
+file(GLOB TEST_FILES "${TEST_DIR}/test*.txt")
+
+# Add custom target for running tests
+add_custom_target(test)
+
+# Create a test command for each test file
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME)
+    add_custom_command(
+        TARGET test
+        COMMAND ${CMAKE_COMMAND} -E echo "Running ${TEST_NAME}..."
+        COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}
+        COMMAND ${PROJECT_NAME} ${TEST_NAME}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endforeach()
+
+# Make test depend on building the executable
+add_dependencies(test ${PROJECT_NAME})
 
 
 === File: ./README.md ===
@@ -228,7 +250,7 @@ public:
     TransactionStatus getStatus() const;
     void setStatus(TransactionStatus status);
     long getStartTime() const;
-    void setCommitTime(long time);  // Add this line
+    void setCommitTime(long time);  
 
     void addReadVariable(const std::string& variableName);
     void addWriteVariable(const std::string& variableName, int value);
@@ -377,6 +399,19 @@ end(T1)
 dump()
 
 
+=== File: ./test/test2.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x1,101) 
+R(T2,x2)
+W(T1,x2,102) 
+R(T2,x1)
+end(T1)
+end(T2)
+dump()
+
+
 === File: ./all_contents.txt ===
 ----------------------------------------
 
@@ -434,15 +469,42 @@ void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction) {
     }
 }
 
-int DataManager::read(const std::string& transactionName, const std::string& variableName, long timestamp) {
-    // Implement read logic considering replication and site status
-    return 0; // Placeholder return value
+int DataManager::read(const string& transactionName, const string& variableName, long timestamp) {
+    int varIndex = stoi(variableName.substr(1));
+    int initialValue = varIndex * 10;  // Initial value for any variable xi is 10*i
+    
+    if (varIndex % 2 == 1) {  // Odd variables
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
+        if (site->getStatus() == SiteStatus::UP) {
+            return site->readVariable(variableName, timestamp);
+        }
+        throw runtime_error("Site " + to_string(siteId) + " is down");
+    } else {  // Even variables - read from any up site
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP) {
+                return site->readVariable(variableName, timestamp);
+            }
+        }
+        throw runtime_error("No available site to read " + variableName);
+    }
+    return initialValue;  // Should never reach here but prevents warning
 }
 
-void DataManager::write(const std::string& transactionName, const std::string& variableName, int value, long commitTime) {
-    // Implement write logic considering replication and site status
-    for (auto& sitePair : sites) {
-        auto site = sitePair.second;
+void DataManager::write(const string& transactionName, const string& variableName, int value, long commitTime) {
+    int varIndex = stoi(variableName.substr(1));
+    
+    if (varIndex % 2 == 0) {  // Even variables - write to all up sites
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP) {
+                site->writeVariable(variableName, value, commitTime);
+            }
+        }
+    } else {  // Odd variables - write to specific site
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
         if (site->getStatus() == SiteStatus::UP) {
             site->writeVariable(variableName, value, commitTime);
         }
@@ -475,6 +537,10 @@ void DataManager::recoverSite(int siteId) {
 #include "Site.h"
 #include <iostream>
 #include <chrono>
+#include <string>
+#include <algorithm>
+using namespace std;
+
 
 Site::Site(int id) : id(id), status(SiteStatus::UP) {
     initializeVariables();
@@ -493,7 +559,7 @@ void Site::setStatus(SiteStatus status) {
 }
 
 // Fixed: Added const qualifier to match the header declaration
-bool Site::hasCommittedWrite(const std::string& variableName, long startTime) const {  
+bool Site::hasCommittedWrite(const string& variableName, long startTime) const {  
     auto it = variables.find(variableName);
     if (it != variables.end()) {
         return it->second.wasModifiedAfter(startTime);
@@ -501,48 +567,87 @@ bool Site::hasCommittedWrite(const std::string& variableName, long startTime) co
     return false;
 }
 
-bool Site::hasVariable(const std::string& variableName) const {
+bool Site::hasVariable(const string& variableName) const {
     return variables.find(variableName) != variables.end();
 }
 
-int Site::readVariable(const std::string& variableName, long timestamp) {
-    std::lock_guard<std::mutex> lock(siteMutex);
+int Site::readVariable(const string& variableName, long timestamp) {
+    lock_guard<mutex> lock(siteMutex);
     return variables[variableName].readValue(timestamp);
 }
 
-void Site::writeVariable(const std::string& variableName, int value, long commitTime) {
-    std::lock_guard<std::mutex> lock(siteMutex);
+void Site::writeVariable(const string& variableName, int value, long commitTime) {
+    lock_guard<mutex> lock(siteMutex);
     variables[variableName].writeValue(value, commitTime);
 }
 
 void Site::fail() {
-    std::lock_guard<std::mutex> lock(siteMutex);
+    lock_guard<mutex> lock(siteMutex);
     status = SiteStatus::DOWN;
 }
 
 void Site::dump() const {
-    std::cout << "=== Site " << id << " ===\n";
+    cout << "=== Site " << id << " ===" << endl;
     if (status == SiteStatus::DOWN) {
-        std::cout << "This site is down.\n";
+        cout << "Site " << id << " is down" << endl;
         return;
     }
     
-    for (std::map<std::string, Variable>::const_iterator it = variables.begin(); 
-         it != variables.end(); ++it) {
-        const std::string& varName = it->first;
-        const Variable& variable = it->second;
-        int value = variable.readValue(std::chrono::system_clock::now().time_since_epoch().count());
-        std::cout << varName << ": " << value << " at site " << id << "\n";
+    bool hasModifiedVars = false;
+    
+    // Check for and print modified odd variables at this site
+    for (const auto& pair : variables) {
+        string varName = pair.first;
+        int varIndex = stoi(varName.substr(1));
+        if (varIndex % 2 == 1) {  // odd variable
+            int value = pair.second.readValue(chrono::system_clock::now().time_since_epoch().count());
+            int initialValue = varIndex * 10;
+            if (value != initialValue) {
+                cout << varName << ": " << value << endl;
+                hasModifiedVars = true;
+            }
+        }
+    }
+    
+    // Check for and print modified even variables
+    for (const auto& pair : variables) {
+        string varName = pair.first;
+        int varIndex = stoi(varName.substr(1));
+        if (varIndex % 2 == 0) {  // even variable
+            int value = pair.second.readValue(chrono::system_clock::now().time_since_epoch().count());
+            int initialValue = varIndex * 10;
+            if (value != initialValue) {
+                cout << varName << ": " << value << " at all sites" << endl;
+                hasModifiedVars = true;
+                break;  // Only need to show once for replicated variables
+            }
+        }
+    }
+    
+    if (!hasModifiedVars) {
+        cout << "All variables have their initial values" << endl;
     }
 }
 
 void Site::recover() {
-    std::lock_guard<std::mutex> lock(siteMutex);
+    lock_guard<mutex> lock(siteMutex);
     status = SiteStatus::RECOVERING;
 }
 
 void Site::initializeVariables() {
     // Initialize variables based on site ID and replication rules
+
+    for (int i = 1; i <= 20; i++) {
+        string varName = "x" + to_string(i);
+        int initialValue = 10 * i;  // x1=10, x2=20, etc.
+        
+        if (i % 2 == 0) {  // Even variables - replicated at all sites
+            variables[varName] = Variable(varName, initialValue);
+        }
+        else if ((1 + i % 10) == id) {  // Odd variables - at specific sites
+            variables[varName] = Variable(varName, initialValue);
+        }
+    }
 }
 
 
@@ -564,13 +669,20 @@ std::string Variable::getName() const {
 }
 
 int Variable::readValue(long timestamp) const {
-    // Implement version selection based on SSI
+    // Return initial value if no versions exist
+    if (versions.empty()) {
+        return stoi(name.substr(1)) * 10;
+    }
+    
+    // Return value of latest version before or at timestamp
     for (auto it = versions.rbegin(); it != versions.rend(); ++it) {
         if (it->commitTime <= timestamp) {
             return it->value;
         }
     }
-    return versions.front().value; // Return initial value if no versions are valid
+    
+    // If no appropriate version found, return initial value
+    return stoi(name.substr(1)) * 10;
 }
 
 bool Variable::wasModifiedAfter(long timestamp) const {
@@ -638,23 +750,13 @@ void TransactionManager::read(const string& transactionName, const string& varia
     }
 
     try {
-        // Read value based on transaction type
-        int value;
-        if (transaction->isReadOnly()) {
-            // Read-only transactions always read from their snapshot at start time
-            value = dataManager->read(transactionName, variableName, transaction->getStartTime());
-        } else {
-            // Read-write transactions read latest committed value before their start time
-            value = dataManager->read(transactionName, variableName, 
-                                    chrono::system_clock::now().time_since_epoch().count());
-            // Record read for validation
-            transaction->addReadVariable(variableName);
-        }
+        int value = dataManager->read(transactionName, variableName, transaction->getStartTime());
+        transaction->addReadVariable(variableName);
         cout << variableName << ": " << value << endl;
     }
     catch (const exception& e) {
         cout << "Read failed for transaction " << transactionName 
-             << " on variable " << variableName << endl;
+             << " on variable " << variableName << ": " << e.what() << endl;
         abortTransaction(transaction);
     }
 }
@@ -709,18 +811,17 @@ void TransactionManager::endTransaction(const string& transactionName) {
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction) {
     if (transaction->isReadOnly()) {
         transaction->setStatus(TransactionStatus::COMMITTED);
-        cout << transaction->getName() << " committed (Read-Only).\n";
+        cout << transaction->getName() << " committed (Read-Only)." << endl;
         return;
     }
 
-    // SSI Validation
+    // Check write-write conflicts (first-committer wins)
     bool hasConflict = false;
     const auto& writeSet = transaction->getWriteSet();
-    const auto& readSet = transaction->getReadSet();
     long startTime = transaction->getStartTime();
 
-    // Check write-write conflicts (first-committer wins)
-    for (const auto& [variableName, value] : writeSet) {
+    for (auto it = writeSet.begin(); it != writeSet.end(); ++it) {
+        const string& variableName = it->first;
         if (dataManager->hasCommittedWrite(variableName, startTime)) {
             cout << "Write-write conflict detected on " << variableName 
                  << " for transaction " << transaction->getName() << endl;
@@ -729,23 +830,20 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction) 
         }
     }
 
-    // TODO: Implement check for consecutive read-write conflicts in serialization graph
-    // This would involve tracking read dependencies between transactions
-    // and detecting cycles with alternating read-write edges
-
     if (hasConflict) {
         abortTransaction(transaction);
-    } else {
-        // Set commit timestamp and commit the transaction
-        long commitTime = chrono::system_clock::now().time_since_epoch().count();
-        transaction->setCommitTime(commitTime);
-        
-        // Write all buffered writes to database
-        dataManager->commitTransaction(transaction);
-        
-        transaction->setStatus(TransactionStatus::COMMITTED);
-        cout << transaction->getName() << " committed.\n";
+        return;
     }
+
+    // If no conflicts, commit the transaction
+    long commitTime = chrono::system_clock::now().time_since_epoch().count();
+    transaction->setCommitTime(commitTime);
+    
+    // Write all buffered writes to database
+    dataManager->commitTransaction(transaction);
+    
+    transaction->setStatus(TransactionStatus::COMMITTED);
+    cout << transaction->getName() << " committed." << endl;
 }
 
 void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction) {
@@ -769,8 +867,7 @@ Transaction::Transaction(const std::string& name, bool isReadOnly)
       readOnly(isReadOnly),
       status(TransactionStatus::ACTIVE),
       startTime(std::chrono::system_clock::now().time_since_epoch().count()),
-      commitTime(0) {  // Initialize commitTime
-}
+      commitTime(0) {}   // Initialize commitTime
 
 std::string Transaction::getName() const { return name; }
 
@@ -922,7 +1019,7 @@ int main() {
     TransactionManager transactionManager(dataManager);
     CommandParser parser(transactionManager);
 
-    std::ifstream inputFile("test1.txt");
+    std::ifstream inputFile("test2.txt");
     if (!inputFile.is_open()) {
         std::cerr << "Failed to open input file 'test1.txt'.\n";
         return 1;
