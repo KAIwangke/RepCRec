@@ -67,6 +67,7 @@ void TransactionManager::read(const string &transactionName, const string &varia
 
 void TransactionManager::write(const string &transactionName, const string &variableName, int value)
 {
+    // iterate to find the transaction need to commited
     auto it = transactions.find(transactionName);
     if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE)
     {
@@ -121,11 +122,22 @@ void TransactionManager::endTransaction(const string &transactionName)
 
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
+    // first checking if the transaction is readonly 
     if (transaction->isReadOnly())
     {
         transaction->setStatus(TransactionStatus::COMMITTED);
         cout << transaction->getName() << " committed (Read-Only)." << endl;
         return;
+    }
+
+    // Check if any sites the transaction wrote to have failed
+    for (int siteId : transaction->getSitesWrittenTo()) {
+        auto site = dataManager->getSite(siteId);
+        if (site && site->getStatus() == SiteStatus::DOWN) {
+            cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
+            abortTransaction(transaction);
+            return;
+        }
     }
 
     // Check write-write conflicts (first-committer wins)
