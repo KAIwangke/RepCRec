@@ -38,3 +38,13 @@ const std::map<std::string, int> &Transaction::getWriteSet() const { return writ
 void Transaction::setCommitTime(long time) { commitTime = time; }
 
 long Transaction::getCommitTime() const { return commitTime; }
+
+void Transaction::addSiteWritten(int siteId)
+{
+    sitesWrittenTo.insert(siteId);
+}
+
+const std::unordered_set<int> &Transaction::getSitesWrittenTo() const
+{
+    return sitesWrittenTo;
+}
