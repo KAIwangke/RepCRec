@@ -34,23 +34,46 @@ set(SOURCES
 # Add executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Find all test files in the test directory
+# Function to create test target
+function(create_test_target TEST_NAME TEST_FILE)
+    add_custom_target(${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}.txt
+        COMMAND ${PROJECT_NAME} ${TEST_NAME}.txt
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        DEPENDS ${PROJECT_NAME}
+    )
+endfunction()
+
+# Find all test files
 file(GLOB TEST_FILES "${TEST_DIR}/test*.txt")
 
-# Add custom target for running tests
-add_custom_target(test)
+# Create all test targets
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
+    create_test_target(${TEST_NAME} ${TEST_FILE})
+endforeach()
 
-# Create a test command for each test file
+# Add a target to run all tests
+add_custom_target(test
+    DEPENDS ${PROJECT_NAME}
+)
+
+# Make test depend on all individual test targets
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
+    add_dependencies(test ${TEST_NAME})
+endforeach()
+
+# Create a target to copy all test files
+add_custom_target(copy_test_files)
+
 foreach(TEST_FILE ${TEST_FILES})
     get_filename_component(TEST_NAME ${TEST_FILE} NAME)
     add_custom_command(
-        TARGET test
-        COMMAND ${CMAKE_COMMAND} -E echo "Running ${TEST_NAME}..."
+        TARGET copy_test_files
         COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}
-        COMMAND ${PROJECT_NAME} ${TEST_NAME}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 endforeach()
 
-# Make test depend on building the executable
-add_dependencies(test ${PROJECT_NAME})
+# Make the executable depend on copying test files
+add_dependencies(${PROJECT_NAME} copy_test_files)
