@@ -6,9 +6,10 @@
 #include <vector>
 #include <memory>
 #include "Site.h"
-#include "Transaction.h"  // Added this include
+#include "Transaction.h" // Added this include
 
-class DataManager {
+class DataManager
+{
 public:
     DataManager();
     void initializeSites();
@@ -17,13 +18,13 @@ public:
     std::vector<std::shared_ptr<Site>> getAllSites();
 
     // Added these new method declarations
-    bool hasCommittedWrite(const std::string& variableName, long startTime);
+    bool hasCommittedWrite(const std::string &variableName, long startTime);
     void commitTransaction(std::shared_ptr<Transaction> transaction);
     void dump();
 
     // Methods to route read/write requests to sites
-    int read(const std::string& transactionName, const std::string& variableName, long timestamp);
-    void write(const std::string& transactionName, const std::string& variableName, int value, long commitTime);
+    int read(const std::string &transactionName, const std::string &variableName, long timestamp);
+    void write(const std::string &transactionName, const std::string &variableName, int value, long commitTime);
 
     // Methods to handle site failures and recoveries
     void failSite(int siteId);
