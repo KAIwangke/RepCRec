@@ -67,7 +67,6 @@ void TransactionManager::read(const string &transactionName, const string &varia
 
 void TransactionManager::write(const string &transactionName, const string &variableName, int value)
 {
-    // iterate to find the transaction need to commited
     auto it = transactions.find(transactionName);
     if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE)
     {
@@ -91,7 +90,40 @@ void TransactionManager::write(const string &transactionName, const string &vari
         return;
     }
 
-    // For SSI, buffer writes until commit time
+    // Determine which sites this write would affect
+    std::vector<int> siteIdsToWrite;
+    if (varIndex % 2 == 0)
+    { // Even variable, replicated
+        for (const auto &site : dataManager->getAllSites())
+        {
+            // Include only sites that are UP
+            if (site->getStatus() == SiteStatus::UP)
+            {
+                if (site->hasVariable(variableName))
+                {
+                    siteIdsToWrite.push_back(site->getId());
+                }
+            }
+        }
+    }
+    else
+    { // Odd variable, located at one site
+        int siteId = 1 + (varIndex % 10);
+        auto site = dataManager->getSite(siteId);
+        // Include only if the site is UP
+        if (site && site->getStatus() == SiteStatus::UP)
+        {
+            if (site->hasVariable(variableName))
+            {
+                siteIdsToWrite.push_back(siteId);
+            }
+        }
+    }
+
+    // Update the transaction's sitesWrittenTo set
+    transaction->addSitesWritten(siteIdsToWrite);
+
+    // Buffer the write
     transaction->addWriteVariable(variableName, value);
     cout << "Write of " << value << " to " << variableName
          << " buffered for transaction " << transactionName << endl;
@@ -122,7 +154,7 @@ void TransactionManager::endTransaction(const string &transactionName)
 
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
-    // first checking if the transaction is readonly 
+    // first checking if the transaction is readonly
     if (transaction->isReadOnly())
     {
         transaction->setStatus(TransactionStatus::COMMITTED);
@@ -130,13 +162,28 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         return;
     }
 
+    long transactionStartTime = transaction->getStartTime();
+    long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
+
     // Check if any sites the transaction wrote to have failed
-    for (int siteId : transaction->getSitesWrittenTo()) {
+    for (int siteId : transaction->getSitesWrittenTo())
+    {
         auto site = dataManager->getSite(siteId);
-        if (site && site->getStatus() == SiteStatus::DOWN) {
-            cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
-            abortTransaction(transaction);
-            return;
+        if (site)
+        {
+            const auto &failureTimes = site->getFailureTimes();
+            for (const auto &[failTime, recoverTime] : failureTimes)
+            {
+                // If the site failed after the transaction started and before it committed
+                // and the failure interval overlaps with the transaction's lifetime
+                if (failTime <= transactionCommitTime &&
+                    (recoverTime == -1 || recoverTime >= transactionStartTime))
+                {
+                    cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
+                    abortTransaction(transaction);
+                    return;
+                }
+            }
         }
     }
 

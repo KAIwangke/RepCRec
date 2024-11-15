@@ -83,7 +83,7 @@ int DataManager::read(const string &transactionName, const string &variableName,
     return initialValue; // Should never reach here but prevents warning
 }
 
-void DataManager::write(std::shared_ptr<Transaction> transaction, const string &variableName, int value, long commitTime)
+void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
 {
     int varIndex = stoi(variableName.substr(1));
 
@@ -92,11 +92,11 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const string &
         for (auto &sitePair : sites)
         {
             auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP)
+            if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
             {
                 site->writeVariable(variableName, value, commitTime);
-                // Record the site ID in the transaction
-                transaction->addSiteWritten(site->getId());
+                // Remove this line:
+                // transaction->addSiteWritten(site->getId());
             }
         }
     }
@@ -104,10 +104,9 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const string &
     { // Odd variables - write to specific site
         int siteId = 1 + (varIndex % 10);
         auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP)
+        if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
         {
             site->writeVariable(variableName, value, commitTime);
-            transaction->addSiteWritten(site->getId());
         }
     }
 }

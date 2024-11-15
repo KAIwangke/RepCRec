@@ -30,6 +30,7 @@ public:
     bool hasVariable(const std::string &variableName) const;
     bool hasCommittedWrite(const std::string &variableName, long startTime) const;
     void dump() const;
+    const std::vector<std::pair<long, long>> &getFailureTimes() const;
 
 private:
     int id;
@@ -38,6 +39,7 @@ private:
     std::map<std::string, Variable> variables;
     std::unordered_set<std::string> unavailableVariables;
     void initializeVariables();
+    std::vector<std::pair<long, long>> failureTimes;
 };
 
 #endif // SITE_H

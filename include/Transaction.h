@@ -6,6 +6,7 @@
 #include <map>
 #include <chrono>
 #include <unordered_set>
+#include <vector>
 
 enum class TransactionStatus
 {
@@ -32,7 +33,7 @@ public:
     const std::set<std::string> &getReadSet() const;
     const std::map<std::string, int> &getWriteSet() const;
     long getCommitTime() const;
-    void addSiteWritten(int siteId);
+    void addSitesWritten(const std::vector<int> &siteIds);
     const std::unordered_set<int> &getSitesWrittenTo() const;
 
 private:
