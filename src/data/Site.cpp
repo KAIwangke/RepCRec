@@ -72,8 +72,10 @@ void Site::fail()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::DOWN;
-    unavailableVariables.clear(); // Clear unavailable variables upon failure
-    // Erase SSI information if needed
+    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
+    failureTimes.emplace_back(failTime, -1); // -1 indicates not yet recovered
+    unavailableVariables.clear();
+    // Additional logic if needed
 }
 
 void Site::dump() const
@@ -132,17 +134,12 @@ void Site::recover()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::RECOVERING;
-
-    // For replicated variables, mark them as unavailable for reading
-    for (const auto &varPair : variables)
+    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
+    if (!failureTimes.empty() && failureTimes.back().second == -1)
     {
-        const std::string &varName = varPair.first;
-        int varIndex = std::stoi(varName.substr(1));
-        if (varIndex % 2 == 0)
-        { // Even-indexed variable (replicated)
-            unavailableVariables.insert(varName);
-        }
+        failureTimes.back().second = recoverTime;
     }
+    // Mark variables as unavailable as before
 }
 
 void Site::initializeVariables()
@@ -166,4 +163,9 @@ void Site::initializeVariables()
             }
         }
     }
+}
+
+const std::vector<std::pair<long, long>> &Site::getFailureTimes() const
+{
+    return failureTimes;
 }

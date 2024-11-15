@@ -1,13 +1,13 @@
-Directory Contents Dump - Thu Nov 14 20:32:41 UTC 2024
+Directory Contents Dump - Fri Nov 15 00:06:36 UTC 2024
 Current Directory: /root/RepCRec
 =========================================
 
-=== File: ./test/test3.5.txt ===
+=== File: ./test/test3_5.txt ===
 ----------------------------------------
 begin(T1)
 begin(T2)
 R(T1,x3)
-W(T2,x8,88) 
+W(T2,x8,88)
 fail(2)
 R(T2,x3)
 W(T1, x4,91)
@@ -43,7 +43,7 @@ recover(2)
 end(T1)
 
 
-=== File: ./test/test3.7.txt ===
+=== File: ./test/test3_7.txt ===
 ----------------------------------------
 begin(T1)
 begin(T2)
@@ -160,26 +160,49 @@ set(SOURCES
 # Add executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Find all test files in the test directory
+# Function to create test target
+function(create_test_target TEST_NAME TEST_FILE)
+    add_custom_target(${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}.txt
+        COMMAND ${PROJECT_NAME} ${TEST_NAME}.txt
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        DEPENDS ${PROJECT_NAME}
+    )
+endfunction()
+
+# Find all test files
 file(GLOB TEST_FILES "${TEST_DIR}/test*.txt")
 
-# Add custom target for running tests
-add_custom_target(test)
+# Create all test targets
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
+    create_test_target(${TEST_NAME} ${TEST_FILE})
+endforeach()
 
-# Create a test command for each test file
+# Add a target to run all tests
+add_custom_target(test
+    DEPENDS ${PROJECT_NAME}
+)
+
+# Make test depend on all individual test targets
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
+    add_dependencies(test ${TEST_NAME})
+endforeach()
+
+# Create a target to copy all test files
+add_custom_target(copy_test_files)
+
 foreach(TEST_FILE ${TEST_FILES})
     get_filename_component(TEST_NAME ${TEST_FILE} NAME)
     add_custom_command(
-        TARGET test
-        COMMAND ${CMAKE_COMMAND} -E echo "Running ${TEST_NAME}..."
+        TARGET copy_test_files
         COMMAND ${CMAKE_COMMAND} -E copy ${TEST_FILE} ${CMAKE_BINARY_DIR}/${TEST_NAME}
-        COMMAND ${PROJECT_NAME} ${TEST_NAME}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 endforeach()
 
-# Make test depend on building the executable
-add_dependencies(test ${PROJECT_NAME})
+# Make the executable depend on copying test files
+add_dependencies(${PROJECT_NAME} copy_test_files)
 
 
 === File: ./src/main.cpp ===
@@ -308,8 +331,10 @@ void Site::fail()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::DOWN;
-    unavailableVariables.clear(); // Clear unavailable variables upon failure
-    // Erase SSI information if needed
+    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
+    failureTimes.emplace_back(failTime, -1); // -1 indicates not yet recovered
+    unavailableVariables.clear();
+    // Additional logic if needed
 }
 
 void Site::dump() const
@@ -368,17 +393,12 @@ void Site::recover()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::RECOVERING;
-
-    // For replicated variables, mark them as unavailable for reading
-    for (const auto &varPair : variables)
+    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
+    if (!failureTimes.empty() && failureTimes.back().second == -1)
     {
-        const std::string &varName = varPair.first;
-        int varIndex = std::stoi(varName.substr(1));
-        if (varIndex % 2 == 0)
-        { // Even-indexed variable (replicated)
-            unavailableVariables.insert(varName);
-        }
+        failureTimes.back().second = recoverTime;
     }
+    // Mark variables as unavailable as before
 }
 
 void Site::initializeVariables()
@@ -404,6 +424,11 @@ void Site::initializeVariables()
     }
 }
 
+const std::vector<std::pair<long, long>> &Site::getFailureTimes() const
+{
+    return failureTimes;
+}
+
 
 
 === File: ./src/data/DataManager.cpp ===
@@ -412,110 +437,139 @@ void Site::initializeVariables()
 #include <iostream>
 using namespace std;
 
-
-DataManager::DataManager() {
+DataManager::DataManager()
+{
     initializeSites();
 }
 
-void DataManager::initializeSites() {
-    for (int i = 1; i <= 10; ++i) {
+void DataManager::initializeSites()
+{
+    for (int i = 1; i <= 10; ++i)
+    {
         sites[i] = std::make_shared<Site>(i);
     }
 }
 
-std::shared_ptr<Site> DataManager::getSite(int siteId) {
+std::shared_ptr<Site> DataManager::getSite(int siteId)
+{
     return sites[siteId];
 }
 
-std::vector<std::shared_ptr<Site>> DataManager::getAllSites() {
+std::vector<std::shared_ptr<Site>> DataManager::getAllSites()
+{
     std::vector<std::shared_ptr<Site>> siteList;
-    for (auto& pair : sites) {
+    for (auto &pair : sites)
+    {
         siteList.push_back(pair.second);
     }
     return siteList;
 }
 
-bool DataManager::hasCommittedWrite(const std::string& variableName, long startTime) {
-    for (const auto& sitePair : sites) {
+bool DataManager::hasCommittedWrite(const std::string &variableName, long startTime)
+{
+    for (const auto &sitePair : sites)
+    {
         auto site = sitePair.second;
-        if (site->hasCommittedWrite(variableName, startTime)) {
+        if (site->hasCommittedWrite(variableName, startTime))
+        {
             return true;
         }
     }
     return false;
 }
 
-void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction) {
-    for (const auto& write : transaction->getWriteSet()) {
-        const std::string& variableName = write.first;
+void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
+{
+    for (const auto &write : transaction->getWriteSet())
+    {
+        const std::string &variableName = write.first;
         int value = write.second;
-        for (const auto& sitePair : sites) {
-            auto site = sitePair.second;
-            if (site->hasVariable(variableName)) {
-                site->writeVariable(variableName, value, transaction->getCommitTime());
-            }
-        }
+        DataManager::write(transaction, variableName, value, transaction->getCommitTime());
     }
 }
 
-int DataManager::read(const string& transactionName, const string& variableName, long timestamp) {
+int DataManager::read(const string &transactionName, const string &variableName, long timestamp)
+{
     int varIndex = stoi(variableName.substr(1));
-    int initialValue = varIndex * 10;  // Initial value for any variable xi is 10*i
-    
-    if (varIndex % 2 == 1) {  // Odd variables
+    int initialValue = varIndex * 10; // Initial value for any variable xi is 10*i
+
+    if (varIndex % 2 == 1)
+    { // Odd variables
         int siteId = 1 + (varIndex % 10);
         auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP) {
+        if (site->getStatus() == SiteStatus::UP)
+        {
             return site->readVariable(variableName, timestamp);
         }
         throw runtime_error("Site " + to_string(siteId) + " is down");
-    } else {  // Even variables - read from any up site
-        for (auto& sitePair : sites) {
+    }
+    else
+    { // Even variables - read from any up site
+        for (auto &sitePair : sites)
+        {
             auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP) {
+            if (site->getStatus() == SiteStatus::UP)
+            {
                 return site->readVariable(variableName, timestamp);
             }
         }
         throw runtime_error("No available site to read " + variableName);
     }
-    return initialValue;  // Should never reach here but prevents warning
+    return initialValue; // Should never reach here but prevents warning
 }
 
-void DataManager::write(const string& transactionName, const string& variableName, int value, long commitTime) {
+void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
+{
     int varIndex = stoi(variableName.substr(1));
-    
-    if (varIndex % 2 == 0) {  // Even variables - write to all up sites
-        for (auto& sitePair : sites) {
+
+    if (varIndex % 2 == 0)
+    { // Even variables - write to all up sites
+        for (auto &sitePair : sites)
+        {
             auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP) {
+            if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
+            {
                 site->writeVariable(variableName, value, commitTime);
+                // Remove this line:
+                // transaction->addSiteWritten(site->getId());
             }
         }
-    } else {  // Odd variables - write to specific site
+    }
+    else
+    { // Odd variables - write to specific site
         int siteId = 1 + (varIndex % 10);
         auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP) {
+        if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
+        {
             site->writeVariable(variableName, value, commitTime);
+            // Remove this line:
+            // transaction->addSiteWritten(site->getId());
         }
     }
 }
 
-void DataManager::failSite(int siteId) {
+void DataManager::failSite(int siteId)
+{
     auto site = getSite(siteId);
-    if (site) {
+    if (site)
+    {
         site->fail();
     }
 }
 
-void DataManager::dump() {
-    for (const auto& sitePair : sites) {
+void DataManager::dump()
+{
+    for (const auto &sitePair : sites)
+    {
         sitePair.second->dump();
     }
 }
 
-void DataManager::recoverSite(int siteId) {
+void DataManager::recoverSite(int siteId)
+{
     auto site = getSite(siteId);
-    if (site) {
+    if (site)
+    {
         site->recover();
     }
 }
@@ -676,7 +730,39 @@ void TransactionManager::write(const string &transactionName, const string &vari
         return;
     }
 
-    // For SSI, buffer writes until commit time
+    // Determine which sites this write would affect
+    std::vector<int> siteIdsToWrite;
+    if (varIndex % 2 == 0)
+    { // Even variable, replicated
+        for (const auto &sitePair : dataManager->getAllSites())
+        {
+            auto site = sitePair;
+            if (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING)
+            {
+                if (site->hasVariable(variableName))
+                {
+                    siteIdsToWrite.push_back(site->getId());
+                }
+            }
+        }
+    }
+    else
+    { // Odd variable, located at one site
+        int siteId = 1 + (varIndex % 10);
+        auto site = dataManager->getSite(siteId);
+        if (site && (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING))
+        {
+            if (site->hasVariable(variableName))
+            {
+                siteIdsToWrite.push_back(siteId);
+            }
+        }
+    }
+
+    // Update the transaction's sitesWrittenTo set
+    transaction->addSitesWritten(siteIdsToWrite);
+
+    // Buffer the write
     transaction->addWriteVariable(variableName, value);
     cout << "Write of " << value << " to " << variableName
          << " buffered for transaction " << transactionName << endl;
@@ -707,11 +793,37 @@ void TransactionManager::endTransaction(const string &transactionName)
 
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
+    // first checking if the transaction is readonly
     if (transaction->isReadOnly())
     {
         transaction->setStatus(TransactionStatus::COMMITTED);
         cout << transaction->getName() << " committed (Read-Only)." << endl;
         return;
+    }
+
+    long transactionStartTime = transaction->getStartTime();
+    long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
+
+    // Check if any sites the transaction wrote to have failed
+    for (int siteId : transaction->getSitesWrittenTo())
+    {
+        auto site = dataManager->getSite(siteId);
+        if (site)
+        {
+            const auto &failureTimes = site->getFailureTimes();
+            for (const auto &[failTime, recoverTime] : failureTimes)
+            {
+                // If the site failed after the transaction started and before it committed
+                // and the failure interval overlaps with the transaction's lifetime
+                if (failTime <= transactionCommitTime &&
+                    (recoverTime == -1 || recoverTime >= transactionStartTime))
+                {
+                    cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
+                    abortTransaction(transaction);
+                    return;
+                }
+            }
+        }
     }
 
     // Check write-write conflicts (first-committer wins)
@@ -815,6 +927,20 @@ const std::map<std::string, int> &Transaction::getWriteSet() const { return writ
 void Transaction::setCommitTime(long time) { commitTime = time; }
 
 long Transaction::getCommitTime() const { return commitTime; }
+
+// tracking the sites that need to be wrote
+void Transaction::addSitesWritten(const std::vector<int> &siteIds)
+{
+    for (int siteId : siteIds)
+    {
+        sitesWrittenTo.insert(siteId);
+    }
+}
+
+const std::unordered_set<int> &Transaction::getSitesWrittenTo() const
+{
+    return sitesWrittenTo;
+}
 
 
 
@@ -1035,6 +1161,7 @@ private:
 #include <map>
 #include <chrono>
 #include <unordered_set>
+#include <vector>
 
 enum class TransactionStatus
 {
@@ -1061,6 +1188,8 @@ public:
     const std::set<std::string> &getReadSet() const;
     const std::map<std::string, int> &getWriteSet() const;
     long getCommitTime() const;
+    void addSitesWritten(const std::vector<int> &siteIds);
+    const std::unordered_set<int> &getSitesWrittenTo() const;
 
 private:
     std::string name;
@@ -1144,7 +1273,8 @@ public:
 
     // Methods to route read/write requests to sites
     int read(const std::string &transactionName, const std::string &variableName, long timestamp);
-    void write(const std::string &transactionName, const std::string &variableName, int value, long commitTime);
+    void write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime);
+    // Pass ptr to track transaction sites
 
     // Methods to handle site failures and recoveries
     void failSite(int siteId);
@@ -1254,6 +1384,7 @@ public:
     bool hasVariable(const std::string &variableName) const;
     bool hasCommittedWrite(const std::string &variableName, long startTime) const;
     void dump() const;
+    const std::vector<std::pair<long, long>> &getFailureTimes() const;
 
 private:
     int id;
@@ -1262,6 +1393,7 @@ private:
     std::map<std::string, Variable> variables;
     std::unordered_set<std::string> unavailableVariables;
     void initializeVariables();
+    std::vector<std::pair<long, long>> failureTimes;
 };
 
 #endif // SITE_H
@@ -1333,7 +1465,27 @@ private:
         "vector": "cpp",
         "algorithm": "cpp",
         "functional": "cpp",
-        "unordered_set": "cpp"
+        "unordered_set": "cpp",
+        "bit": "cpp",
+        "*.tcc": "cpp",
+        "chrono": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "condition_variable": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "format": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "span": "cpp",
+        "stop_token": "cpp",
+        "text_encoding": "cpp",
+        "thread": "cpp"
     }
 }
 

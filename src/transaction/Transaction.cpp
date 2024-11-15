@@ -24,7 +24,6 @@ void Transaction::setStatus(TransactionStatus newStatus)
     }
 }
 
-
 long Transaction::getStartTime() const { return startTime; }
 
 void Transaction::addReadVariable(const std::string &variableName) { readSet.insert(variableName); }
@@ -41,10 +40,15 @@ void Transaction::setCommitTime(long time) { commitTime = time; }
 long Transaction::getCommitTime() const { return commitTime; }
 
 // tracking the sites that need to be wrote
-void Transaction::addSiteWritten(int siteId) {
-    sitesWrittenTo.insert(siteId);
+void Transaction::addSitesWritten(const std::vector<int> &siteIds)
+{
+    for (int siteId : siteIds)
+    {
+        sitesWrittenTo.insert(siteId);
+    }
 }
 
-const std::unordered_set<int>& Transaction::getSitesWrittenTo() const {
+const std::unordered_set<int> &Transaction::getSitesWrittenTo() const
+{
     return sitesWrittenTo;
 }
