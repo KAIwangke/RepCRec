@@ -1,125 +1,140 @@
-Directory Contents Dump - Fri Nov 15 00:06:36 UTC 2024
-Current Directory: /root/RepCRec
+Directory Contents Dump - Sun Nov 17 21:08:39 UTC 2024
+Current Directory: /root/Database
 =========================================
 
-=== File: ./test/test3_5.txt ===
+=== File: ./scan.sh ===
 ----------------------------------------
-begin(T1)
-begin(T2)
-R(T1,x3)
-W(T2,x8,88)
-fail(2)
-R(T2,x3)
-W(T1, x4,91)
-recover(2)
-end(T2)
-end(T1)
+#!/bin/bash
+# Output file
+OUTPUT_FILE="all_contents.txt"
+
+# Clear or create output file
+> "$OUTPUT_FILE"
+
+# Add header with timestamp
+echo "Directory Contents Dump - $(date)" >> "$OUTPUT_FILE"
+echo "Current Directory: $(pwd)" >> "$OUTPUT_FILE"
+echo "=========================================" >> "$OUTPUT_FILE"
+echo >> "$OUTPUT_FILE"
+
+# Find all files while ignoring .git, build dir, and binary files
+find . -type f \
+    -not -path "*.git*" \
+    -not -path "*build*" \
+    -not -name "*.o" \
+    -not -name "*.exe" \
+    -not -name "*.a" \
+    -not -name "*.so" \
+    -not -name "*.pyc" \
+    -not -name "*.class" \
+    -not -name "*.jar" \
+    -not -name "*.war" \
+    -not -name "*.dll" \
+    -not -name "*.bin" \
+    -print0 | while IFS= read -r -d '' file; do
+    
+    # Print file header
+    echo "=== File: $file ===" >> "$OUTPUT_FILE"
+    echo "----------------------------------------" >> "$OUTPUT_FILE"
+    
+    # Try to cat the file contents, redirect errors to /dev/null
+    cat "$file" 2>/dev/null >> "$OUTPUT_FILE"
+    
+    # Add spacer between files
+    echo -e "\n\n" >> "$OUTPUT_FILE"
+done
+
+echo "Contents have been saved to $OUTPUT_FILE"
 
 
-=== File: ./test/test2.txt ===
+=== File: ./.vscode/settings.json ===
 ----------------------------------------
-begin(T1)
-begin(T2)
-W(T1,x1,101) 
-R(T2,x2)
-W(T1,x2,102) 
-R(T2,x1)
-end(T1)
-end(T2)
-dump()
-
-
-=== File: ./test/test4.txt ===
-----------------------------------------
-begin(T1)
-begin(T2)
-W(T1,x1,512)
-fail(2)
-W(T2,x8,88) 
-R(T2,x3)
-R(T1, x5)
-end(T2)
-recover(2)
-end(T1)
-
-
-=== File: ./test/test3_7.txt ===
-----------------------------------------
-begin(T1)
-begin(T2)
-R(T1,x3)
-W(T2,x8,88) 
-fail(2)
-R(T2,x3)
-recover(2)
-W(T1, x4,91)
-end(T2)
-end(T1)
-
-
-
-=== File: ./test/test5.txt ===
-----------------------------------------
-begin(T1)
-begin(T2)
-W(T1,x6,66)
-fail(2)
-W(T2,x8,88) 
-R(T2,x3)
-R(T1, x5)
-end(T2)
-recover(2)
-end(T1)
-
-
-=== File: ./test/test1.txt ===
-----------------------------------------
-begin(T1)
-begin(T2)
-W(T1,x1,101) 
-W(T2,x2,202)
-W(T1,x2,102) 
-W(T2,x1,201)
-end(T2)
-end(T1)
-dump()
-
-
-=== File: ./test/test3.txt ===
-----------------------------------------
-begin(T1)
-begin(T2)
-R(T1,x3)
-fail(2)
-W(T2,x8,88) 
-R(T2,x3)
-W(T1, x5,91)
-end(T2)
-recover(2)
-end(T1)
-
-
-=== File: ./README.md ===
-----------------------------------------
-Collaboration Plan
-
-Part1: Transaction Management
-1. Implement the TransactionManager class, focusing on SSI logic.
-2. Develop the Transaction class to store transaction data.
-3. Implement command parsing in CommandParser and integrate it with TransactionManager.
-4. Handle transaction lifecycle: begin, read, write, validate, commit, abort.
-5. Implement conflict detection and resolution according to SSI rules.
-
-Part 2: Data Management
-1. Implement the DataManager class to manage sites.
-2. Develop the Site class to handle variables, failures, and recoveries.
-3. Implement the Variable class with versioning to support SSI.
-4. Handle read and write operations at the site level, considering replication.
-5. Implement site failure and recovery logic, ensuring proper variable availability.
-
-
-test cases: https://cs.nyu.edu/courses/fall24/CSCI-GA.2434-001/projectsampletests.serializablesnapshotisolation
-
+{
+    "files.associations": {
+        "__bit_reference": "cpp",
+        "__config": "cpp",
+        "__debug": "cpp",
+        "__errc": "cpp",
+        "__hash_table": "cpp",
+        "__locale": "cpp",
+        "__mutex_base": "cpp",
+        "__node_handle": "cpp",
+        "__split_buffer": "cpp",
+        "__threading_support": "cpp",
+        "__tree": "cpp",
+        "__verbose_abort": "cpp",
+        "array": "cpp",
+        "atomic": "cpp",
+        "bitset": "cpp",
+        "cctype": "cpp",
+        "charconv": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "complex": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "exception": "cpp",
+        "fstream": "cpp",
+        "initializer_list": "cpp",
+        "iomanip": "cpp",
+        "ios": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "locale": "cpp",
+        "map": "cpp",
+        "mutex": "cpp",
+        "new": "cpp",
+        "optional": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "regex": "cpp",
+        "set": "cpp",
+        "sstream": "cpp",
+        "stdexcept": "cpp",
+        "streambuf": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "system_error": "cpp",
+        "tuple": "cpp",
+        "typeinfo": "cpp",
+        "unordered_map": "cpp",
+        "variant": "cpp",
+        "vector": "cpp",
+        "algorithm": "cpp",
+        "functional": "cpp",
+        "unordered_set": "cpp",
+        "bit": "cpp",
+        "*.tcc": "cpp",
+        "chrono": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "condition_variable": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "format": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp",
+        "span": "cpp",
+        "stop_token": "cpp",
+        "text_encoding": "cpp",
+        "thread": "cpp"
+    }
+}
 
 
 === File: ./CMakeLists.txt ===
@@ -205,53 +220,687 @@ endforeach()
 add_dependencies(${PROJECT_NAME} copy_test_files)
 
 
-=== File: ./src/main.cpp ===
+=== File: ./README.md ===
 ----------------------------------------
-#include <iostream>
-#include <fstream>
-#include <memory>
+Collaboration Plan
+
+Part1: Transaction Management
+1. Implement the TransactionManager class, focusing on SSI logic.
+2. Develop the Transaction class to store transaction data.
+3. Implement command parsing in CommandParser and integrate it with TransactionManager.
+4. Handle transaction lifecycle: begin, read, write, validate, commit, abort.
+5. Implement conflict detection and resolution according to SSI rules.
+
+Part 2: Data Management
+1. Implement the DataManager class to manage sites.
+2. Develop the Site class to handle variables, failures, and recoveries.
+3. Implement the Variable class with versioning to support SSI.
+4. Handle read and write operations at the site level, considering replication.
+5. Implement site failure and recovery logic, ensuring proper variable availability.
+
+
+test cases: https://cs.nyu.edu/courses/fall24/CSCI-GA.2434-001/projectsampletests.serializablesnapshotisolation
+
+
+
+=== File: ./include/CommandParser.h ===
+----------------------------------------
+#ifndef COMMAND_PARSER_H
+#define COMMAND_PARSER_H
+
 #include <string>
-#include "TransactionManager.h"
+#include <vector>
+
+class TransactionManager;
+
+class CommandParser {
+public:
+    CommandParser(TransactionManager& tm);
+    void parseCommand(const std::string& command);
+
+private:
+    TransactionManager& transactionManager;
+    std::vector<std::string> tokenize(const std::string& str, char delimiter);
+};
+
+#endif // COMMAND_PARSER_H
+
+
+
+=== File: ./include/DataManager.h ===
+----------------------------------------
+#ifndef DATA_MANAGER_H
+#define DATA_MANAGER_H
+
+#include <string>
+#include <map>
+#include <vector>
+#include <memory>
+#include "Site.h"
+#include "Transaction.h" // Added this include
+
+class DataManager
+{
+public:
+    DataManager();
+    void initializeSites();
+
+    std::shared_ptr<Site> getSite(int siteId);
+    std::vector<std::shared_ptr<Site>> getAllSites();
+
+    // Added these new method declarations
+    bool hasCommittedWrite(const std::string &variableName, long startTime);
+    void commitTransaction(std::shared_ptr<Transaction> transaction);
+    void dump();
+
+    // Methods to route read/write requests to sites
+    int read(const std::string &transactionName, const std::string &variableName, long timestamp);
+    void write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime);
+    // Pass ptr to track transaction sites
+
+    // Methods to handle site failures and recoveries
+    void failSite(int siteId);
+    void recoverSite(int siteId);
+
+private:
+    std::map<int, std::shared_ptr<Site>> sites;
+};
+
+#endif // DATA_MANAGER_H
+
+
+=== File: ./include/Lock.h ===
+----------------------------------------
+#ifndef LOCK_H
+#define LOCK_H
+
+#include <iostream>
+#include <set>
+
+using namespace std;
+
+#define TOTAL_VARIABLES 20
+
+enum Lock_type
+{
+    READ_LOCK,
+    WRITE_LOCK,
+    NO_LOCK
+};
+
+class Lock
+{
+public:
+    Lock_type type;
+    // TODO: Modify the DS
+    set<int> transactions;
+    Lock(Lock_type type, set<int> transactions);
+};
+
+#endif
+
+
+=== File: ./include/Transaction.h ===
+----------------------------------------
+#ifndef TRANSACTION_H
+#define TRANSACTION_H
+
+#include <string>
+#include <set>
+#include <map>
+#include <chrono>
+#include <unordered_set>
+#include <vector>
+
+enum class TransactionStatus
+{
+    ACTIVE,
+    COMMITTED,
+    ABORTED
+};
+
+class Transaction
+{
+public:
+    Transaction(const std::string &name, bool isReadOnly);
+
+    std::string getName() const;
+    bool isReadOnly() const;
+    TransactionStatus getStatus() const;
+    void setStatus(TransactionStatus status);
+    long getStartTime() const;
+    void setCommitTime(long time);
+
+    void addReadVariable(const std::string &variableName);
+    void addWriteVariable(const std::string &variableName, int value);
+
+    const std::set<std::string> &getReadSet() const;
+    const std::map<std::string, int> &getWriteSet() const;
+    long getCommitTime() const;
+    void addSitesWritten(const std::vector<int> &siteIds);
+    const std::unordered_set<int> &getSitesWrittenTo() const;
+
+private:
+    std::string name;
+    bool readOnly;
+    TransactionStatus status;
+    long startTime; // Use timestamp for SSI
+    long commitTime;
+
+    std::set<std::string> readSet;
+    std::map<std::string, int> writeSet;
+    std::unordered_set<int> sitesWrittenTo;
+};
+
+#endif // TRANSACTION_H
+
+
+
+=== File: ./include/Site.h ===
+----------------------------------------
+#ifndef SITE_H
+#define SITE_H
+
+#include <string>
+#include <map>
+#include <mutex>
+#include <unordered_set>
+#include "Variable.h"
+
+enum class SiteStatus
+{
+    UP,
+    DOWN,
+    RECOVERING
+};
+
+class Site
+{
+public:
+    Site(int id);
+    int getId() const;
+    SiteStatus getStatus() const;
+    void setStatus(SiteStatus status);
+
+    int readVariable(const std::string &variableName, long timestamp);
+    void writeVariable(const std::string &variableName, int value, long commitTime);
+
+    void fail();
+    void recover();
+    bool hasVariable(const std::string &variableName) const;
+    bool hasCommittedWrite(const std::string &variableName, long startTime) const;
+    void dump() const;
+    const std::vector<std::pair<long, long>> &getFailureTimes() const;
+
+private:
+    int id;
+    SiteStatus status;
+    std::mutex siteMutex;
+    std::map<std::string, Variable> variables;
+    std::unordered_set<std::string> unavailableVariables;
+    void initializeVariables();
+    std::vector<std::pair<long, long>> failureTimes;
+};
+
+#endif // SITE_H
+
+
+
+=== File: ./include/Variable.h ===
+----------------------------------------
+#ifndef VARIABLE_H
+#define VARIABLE_H
+
+#include <string>
+#include <vector>
+
+struct Version {
+    int value;
+    long commitTime;
+};
+
+class Variable {
+public:
+    Variable(); // Default constructor
+    Variable(const std::string& name, int initialValue);
+
+    std::string getName() const;
+    int readValue(long timestamp) const;
+    void writeValue(int value, long commitTime);
+    bool wasModifiedAfter(long timestamp) const;
+
+private:
+    std::string name;
+    std::vector<Version> versions;
+};
+
+#endif // VARIABLE_H
+
+
+
+=== File: ./include/TransactionManager.h ===
+----------------------------------------
+#ifndef TRANSACTION_MANAGER_H
+#define TRANSACTION_MANAGER_H
+
+#include <string>
+#include <map>
+#include <memory>
+#include "Transaction.h"
 #include "DataManager.h"
-#include "CommandParser.h"
 
-int main(int argc, char* argv[]) {
-    auto dataManager = std::make_shared<DataManager>();
-    TransactionManager transactionManager(dataManager);
-    CommandParser parser(transactionManager);
+class TransactionManager
+{
+public:
+    TransactionManager(std::shared_ptr<DataManager> dm);
+    void processCommand(const std::string &command);
 
-    std::istream* input = &std::cin; // Default to standard input
-    std::ifstream inputFile;
+    void beginTransaction(const std::string &transactionName, bool isReadOnly);
+    void read(const std::string &transactionName, const std::string &variableName);
+    void write(const std::string &transactionName, const std::string &variableName, int value);
+    void endTransaction(const std::string &transactionName);
+    void dump() const;
+    void failSite(int siteId);
+    void recoverSite(int siteId);
 
-    // If filename provided as command line argument
-    if (argc > 1) {
-        inputFile.open(argv[1]);
-        if (!inputFile.is_open()) {
-            std::cerr << "Failed to open input file '" << argv[1] << "'.\n";
-            return 1;
+private:
+    std::map<std::string, std::shared_ptr<Transaction>> transactions;
+    std::shared_ptr<DataManager> dataManager; // Interface to Data Managers
+
+    // Helper methods
+    void validateAndCommit(std::shared_ptr<Transaction> transaction);
+    void abortTransaction(std::shared_ptr<Transaction> transaction);
+};
+
+#endif // TRANSACTION_MANAGER_H
+
+
+
+=== File: ./test/test8.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T2,x1)
+R(T2,x2)
+W(T1,x3,33)
+end(T1)
+begin(T3)
+R(T3,x3)
+R(T2,x3)
+end(T2)
+end(T3)
+
+
+=== File: ./test/test5.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x6,66)
+fail(2)
+W(T2,x8,88) 
+R(T2,x3)
+R(T1, x5)
+end(T2)
+recover(2)
+end(T1)
+
+
+=== File: ./test/test7.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T2,x1)
+R(T2,x2)
+W(T1,x3,33)
+end(T1)
+R(T2,x3)
+end(T2)
+
+
+
+=== File: ./test/test3.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T1,x3)
+fail(2)
+W(T2,x8,88) 
+R(T2,x3)
+W(T1, x5,91)
+end(T2)
+recover(2)
+end(T1)
+
+
+=== File: ./test/test4.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x1,512)
+fail(2)
+W(T2,x8,88) 
+R(T2,x3)
+R(T1, x5)
+end(T2)
+recover(2)
+end(T1)
+
+
+=== File: ./test/test15.txt ===
+----------------------------------------
+begin(T5)
+begin(T4)
+begin(T3)
+begin(T2)
+begin(T1)
+W(T1,x4, 5)
+fail(2)
+W(T2,x4,44)
+recover(2)
+W(T3,x4,55)
+W(T4,x4,66)
+W(T5,x4,77)
+end(T1)
+end(T2)
+end(T3)
+end(T4)
+end(T5)
+
+
+=== File: ./test/test1.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x1,101) 
+W(T2,x2,202)
+W(T1,x2,102) 
+W(T2,x1,201)
+end(T2)
+end(T1)
+dump()
+
+
+=== File: ./test/test12.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T1,x2)
+R(T2,x2)
+end(T1)
+W(T2,x2,10)
+end(T2)
+
+
+=== File: ./test/test13.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+begin(T3)
+W(T3,x2,10)
+W(T2,x2,20)
+W(T1,x2,30)
+end(T3)
+end(T2)
+end(T1)
+
+
+
+=== File: ./test/test3_5.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T1,x3)
+W(T2,x8,88)
+fail(2)
+R(T2,x3)
+W(T1, x4,91)
+recover(2)
+end(T2)
+end(T1)
+
+
+=== File: ./test/test11.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T1,x2)
+R(T2,x2)
+W(T2,x2,10)
+end(T1)
+end(T2)
+
+
+=== File: ./test/test2.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+W(T1,x1,101) 
+R(T2,x2)
+W(T1,x2,102) 
+R(T2,x1)
+end(T1)
+end(T2)
+dump()
+
+
+=== File: ./test/test6.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+fail(3) 
+fail(4)
+R(T1,x1)
+W(T2,x8,88)
+end(T1)
+recover(4) 
+recover(3)
+R(T2,x3)
+end(T2)
+dump()
+
+
+=== File: ./test/test3_7.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+R(T1,x3)
+W(T2,x8,88) 
+fail(2)
+R(T2,x3)
+recover(2)
+W(T1, x4,91)
+end(T2)
+end(T1)
+
+
+
+=== File: ./test/test10.txt ===
+----------------------------------------
+begin(T2)
+begin(T3)
+W(T3,x2,22)
+W(T2,x4,44)
+R(T3,x4)
+end(T2)
+end(T3)
+begin(T1)
+R(T1,x2)
+end(T1)
+
+
+
+=== File: ./test/test9.txt ===
+----------------------------------------
+begin(T3)
+begin(T1)
+begin(T2)
+W(T3,x2,22)
+W(T2,x4,44)
+R(T3,x4)
+end(T2)
+end(T3)
+R(T1,x2)
+end(T1)
+
+
+=== File: ./test/test14.txt ===
+----------------------------------------
+begin(T1)
+begin(T2)
+begin(T3)
+W(T3,x2,10)
+W(T1,x2,20)
+W(T2,x2,30)
+end(T1)
+end(T3)
+end(T2)
+
+
+
+=== File: ./all_contents.txt ===
+----------------------------------------
+
+
+
+=== File: ./src/data/DataManager.cpp ===
+----------------------------------------
+#include "DataManager.h"
+#include <iostream>
+using namespace std;
+
+DataManager::DataManager()
+{
+    initializeSites();
+}
+
+void DataManager::initializeSites()
+{
+    for (int i = 1; i <= 10; ++i)
+    {
+        sites[i] = std::make_shared<Site>(i);
+    }
+}
+
+std::shared_ptr<Site> DataManager::getSite(int siteId)
+{
+    return sites[siteId];
+}
+
+std::vector<std::shared_ptr<Site>> DataManager::getAllSites()
+{
+    std::vector<std::shared_ptr<Site>> siteList;
+    for (auto &pair : sites)
+    {
+        siteList.push_back(pair.second);
+    }
+    return siteList;
+}
+
+bool DataManager::hasCommittedWrite(const std::string &variableName, long startTime)
+{
+    for (const auto &sitePair : sites)
+    {
+        auto site = sitePair.second;
+        if (site->hasCommittedWrite(variableName, startTime))
+        {
+            return true;
         }
-        input = &inputFile;
     }
+    return false;
+}
 
-    std::string command;
-    while (std::getline(*input, command)) {
-        // Skip empty lines or comments
-        if (command.empty() || command[0] == '/') {
-            continue;
+void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
+{
+    for (const auto &write : transaction->getWriteSet())
+    {
+        const std::string &variableName = write.first;
+        int value = write.second;
+        DataManager::write(transaction, variableName, value, transaction->getCommitTime());
+    }
+}
+
+int DataManager::read(const string &transactionName, const string &variableName, long timestamp)
+{
+    int varIndex = stoi(variableName.substr(1));
+    int initialValue = varIndex * 10; // Initial value for any variable xi is 10*i
+
+    if (varIndex % 2 == 1)
+    { // Odd variables
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
+        if (site->getStatus() == SiteStatus::UP)
+        {
+            return site->readVariable(variableName, timestamp);
         }
-
-        // Process each command immediately
-        parser.parseCommand(command);
-
-        // Flush output after each command to ensure sequential output
-        std::cout.flush();
+        throw runtime_error("Site " + to_string(siteId) + " is down");
     }
-
-    if (inputFile.is_open()) {
-        inputFile.close();
+    else
+    { // Even variables - read from any up site
+        for (auto &sitePair : sites)
+        {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP)
+            {
+                return site->readVariable(variableName, timestamp);
+            }
+        }
+        throw runtime_error("No available site to read " + variableName);
     }
+    return initialValue; // Should never reach here but prevents warning
+}
 
-    return 0;
+void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
+{
+    int varIndex = stoi(variableName.substr(1));
+
+    if (varIndex % 2 == 0)
+    { // Even variables - write to all up sites
+        for (auto &sitePair : sites)
+        {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
+            {
+                site->writeVariable(variableName, value, commitTime);
+                // Remove this line:
+                // transaction->addSiteWritten(site->getId());
+            }
+        }
+    }
+    else
+    { // Odd variables - write to specific site
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
+        if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
+        {
+            site->writeVariable(variableName, value, commitTime);
+        }
+    }
+}
+
+void DataManager::failSite(int siteId)
+{
+    auto site = getSite(siteId);
+    if (site)
+    {
+        site->fail();
+    }
+}
+
+void DataManager::dump()
+{
+    for (const auto &sitePair : sites)
+    {
+        sitePair.second->dump();
+    }
+}
+
+void DataManager::recoverSite(int siteId)
+{
+    auto site = getSite(siteId);
+    if (site)
+    {
+        site->recover();
+    }
 }
 
 
@@ -431,150 +1080,6 @@ const std::vector<std::pair<long, long>> &Site::getFailureTimes() const
 
 
 
-=== File: ./src/data/DataManager.cpp ===
-----------------------------------------
-#include "DataManager.h"
-#include <iostream>
-using namespace std;
-
-DataManager::DataManager()
-{
-    initializeSites();
-}
-
-void DataManager::initializeSites()
-{
-    for (int i = 1; i <= 10; ++i)
-    {
-        sites[i] = std::make_shared<Site>(i);
-    }
-}
-
-std::shared_ptr<Site> DataManager::getSite(int siteId)
-{
-    return sites[siteId];
-}
-
-std::vector<std::shared_ptr<Site>> DataManager::getAllSites()
-{
-    std::vector<std::shared_ptr<Site>> siteList;
-    for (auto &pair : sites)
-    {
-        siteList.push_back(pair.second);
-    }
-    return siteList;
-}
-
-bool DataManager::hasCommittedWrite(const std::string &variableName, long startTime)
-{
-    for (const auto &sitePair : sites)
-    {
-        auto site = sitePair.second;
-        if (site->hasCommittedWrite(variableName, startTime))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
-{
-    for (const auto &write : transaction->getWriteSet())
-    {
-        const std::string &variableName = write.first;
-        int value = write.second;
-        DataManager::write(transaction, variableName, value, transaction->getCommitTime());
-    }
-}
-
-int DataManager::read(const string &transactionName, const string &variableName, long timestamp)
-{
-    int varIndex = stoi(variableName.substr(1));
-    int initialValue = varIndex * 10; // Initial value for any variable xi is 10*i
-
-    if (varIndex % 2 == 1)
-    { // Odd variables
-        int siteId = 1 + (varIndex % 10);
-        auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP)
-        {
-            return site->readVariable(variableName, timestamp);
-        }
-        throw runtime_error("Site " + to_string(siteId) + " is down");
-    }
-    else
-    { // Even variables - read from any up site
-        for (auto &sitePair : sites)
-        {
-            auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP)
-            {
-                return site->readVariable(variableName, timestamp);
-            }
-        }
-        throw runtime_error("No available site to read " + variableName);
-    }
-    return initialValue; // Should never reach here but prevents warning
-}
-
-void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
-{
-    int varIndex = stoi(variableName.substr(1));
-
-    if (varIndex % 2 == 0)
-    { // Even variables - write to all up sites
-        for (auto &sitePair : sites)
-        {
-            auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
-            {
-                site->writeVariable(variableName, value, commitTime);
-                // Remove this line:
-                // transaction->addSiteWritten(site->getId());
-            }
-        }
-    }
-    else
-    { // Odd variables - write to specific site
-        int siteId = 1 + (varIndex % 10);
-        auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
-        {
-            site->writeVariable(variableName, value, commitTime);
-            // Remove this line:
-            // transaction->addSiteWritten(site->getId());
-        }
-    }
-}
-
-void DataManager::failSite(int siteId)
-{
-    auto site = getSite(siteId);
-    if (site)
-    {
-        site->fail();
-    }
-}
-
-void DataManager::dump()
-{
-    for (const auto &sitePair : sites)
-    {
-        sitePair.second->dump();
-    }
-}
-
-void DataManager::recoverSite(int siteId)
-{
-    auto site = getSite(siteId);
-    if (site)
-    {
-        site->recover();
-    }
-}
-
-
 === File: ./src/data/Variable.cpp ===
 ----------------------------------------
 #include "Variable.h"
@@ -623,17 +1128,6 @@ void Variable::writeValue(int value, long commitTime) {
 }
 
 
-
-
-=== File: ./src/LockTable.cpp ===
-----------------------------------------
-#include "Lock.h"
-
-Lock::Lock(Lock_type type, set<int> transactions)
-{
-    this->type = type;
-    this->transactions = transactions;
-}
 
 
 === File: ./src/transaction/TransactionManager.cpp ===
@@ -734,10 +1228,10 @@ void TransactionManager::write(const string &transactionName, const string &vari
     std::vector<int> siteIdsToWrite;
     if (varIndex % 2 == 0)
     { // Even variable, replicated
-        for (const auto &sitePair : dataManager->getAllSites())
+        for (const auto &site : dataManager->getAllSites())
         {
-            auto site = sitePair;
-            if (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING)
+            // Include only sites that are UP
+            if (site->getStatus() == SiteStatus::UP)
             {
                 if (site->hasVariable(variableName))
                 {
@@ -750,7 +1244,8 @@ void TransactionManager::write(const string &transactionName, const string &vari
     { // Odd variable, located at one site
         int siteId = 1 + (varIndex % 10);
         auto site = dataManager->getSite(siteId);
-        if (site && (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING))
+        // Include only if the site is UP
+        if (site && site->getStatus() == SiteStatus::UP)
         {
             if (site->hasVariable(variableName))
             {
@@ -1077,416 +1572,64 @@ vector<string> CommandParser::tokenize(const string &str, char delimiter)
 }
 
 
-=== File: ./all_contents.txt ===
+=== File: ./src/LockTable.cpp ===
 ----------------------------------------
+#include "Lock.h"
 
-
-
-=== File: ./scan.sh ===
-----------------------------------------
-#!/bin/bash
-# Output file
-OUTPUT_FILE="all_contents.txt"
-
-# Clear or create output file
-> "$OUTPUT_FILE"
-
-# Add header with timestamp
-echo "Directory Contents Dump - $(date)" >> "$OUTPUT_FILE"
-echo "Current Directory: $(pwd)" >> "$OUTPUT_FILE"
-echo "=========================================" >> "$OUTPUT_FILE"
-echo >> "$OUTPUT_FILE"
-
-# Find all files while ignoring .git, build dir, and binary files
-find . -type f \
-    -not -path "*.git*" \
-    -not -path "*build*" \
-    -not -name "*.o" \
-    -not -name "*.exe" \
-    -not -name "*.a" \
-    -not -name "*.so" \
-    -not -name "*.pyc" \
-    -not -name "*.class" \
-    -not -name "*.jar" \
-    -not -name "*.war" \
-    -not -name "*.dll" \
-    -not -name "*.bin" \
-    -print0 | while IFS= read -r -d '' file; do
-    
-    # Print file header
-    echo "=== File: $file ===" >> "$OUTPUT_FILE"
-    echo "----------------------------------------" >> "$OUTPUT_FILE"
-    
-    # Try to cat the file contents, redirect errors to /dev/null
-    cat "$file" 2>/dev/null >> "$OUTPUT_FILE"
-    
-    # Add spacer between files
-    echo -e "\n\n" >> "$OUTPUT_FILE"
-done
-
-echo "Contents have been saved to $OUTPUT_FILE"
-
-
-=== File: ./include/CommandParser.h ===
-----------------------------------------
-#ifndef COMMAND_PARSER_H
-#define COMMAND_PARSER_H
-
-#include <string>
-#include <vector>
-
-class TransactionManager;
-
-class CommandParser {
-public:
-    CommandParser(TransactionManager& tm);
-    void parseCommand(const std::string& command);
-
-private:
-    TransactionManager& transactionManager;
-    std::vector<std::string> tokenize(const std::string& str, char delimiter);
-};
-
-#endif // COMMAND_PARSER_H
-
-
-
-=== File: ./include/Transaction.h ===
-----------------------------------------
-#ifndef TRANSACTION_H
-#define TRANSACTION_H
-
-#include <string>
-#include <set>
-#include <map>
-#include <chrono>
-#include <unordered_set>
-#include <vector>
-
-enum class TransactionStatus
+Lock::Lock(Lock_type type, set<int> transactions)
 {
-    ACTIVE,
-    COMMITTED,
-    ABORTED
-};
-
-class Transaction
-{
-public:
-    Transaction(const std::string &name, bool isReadOnly);
-
-    std::string getName() const;
-    bool isReadOnly() const;
-    TransactionStatus getStatus() const;
-    void setStatus(TransactionStatus status);
-    long getStartTime() const;
-    void setCommitTime(long time);
-
-    void addReadVariable(const std::string &variableName);
-    void addWriteVariable(const std::string &variableName, int value);
-
-    const std::set<std::string> &getReadSet() const;
-    const std::map<std::string, int> &getWriteSet() const;
-    long getCommitTime() const;
-    void addSitesWritten(const std::vector<int> &siteIds);
-    const std::unordered_set<int> &getSitesWrittenTo() const;
-
-private:
-    std::string name;
-    bool readOnly;
-    TransactionStatus status;
-    long startTime; // Use timestamp for SSI
-    long commitTime;
-
-    std::set<std::string> readSet;
-    std::map<std::string, int> writeSet;
-    std::unordered_set<int> sitesWrittenTo;
-};
-
-#endif // TRANSACTION_H
+    this->type = type;
+    this->transactions = transactions;
+}
 
 
-
-=== File: ./include/TransactionManager.h ===
+=== File: ./src/main.cpp ===
 ----------------------------------------
-#ifndef TRANSACTION_MANAGER_H
-#define TRANSACTION_MANAGER_H
-
-#include <string>
-#include <map>
-#include <memory>
-#include "Transaction.h"
-#include "DataManager.h"
-
-class TransactionManager
-{
-public:
-    TransactionManager(std::shared_ptr<DataManager> dm);
-    void processCommand(const std::string &command);
-
-    void beginTransaction(const std::string &transactionName, bool isReadOnly);
-    void read(const std::string &transactionName, const std::string &variableName);
-    void write(const std::string &transactionName, const std::string &variableName, int value);
-    void endTransaction(const std::string &transactionName);
-    void dump() const;
-    void failSite(int siteId);
-    void recoverSite(int siteId);
-
-private:
-    std::map<std::string, std::shared_ptr<Transaction>> transactions;
-    std::shared_ptr<DataManager> dataManager; // Interface to Data Managers
-
-    // Helper methods
-    void validateAndCommit(std::shared_ptr<Transaction> transaction);
-    void abortTransaction(std::shared_ptr<Transaction> transaction);
-};
-
-#endif // TRANSACTION_MANAGER_H
-
-
-
-=== File: ./include/DataManager.h ===
-----------------------------------------
-#ifndef DATA_MANAGER_H
-#define DATA_MANAGER_H
-
-#include <string>
-#include <map>
-#include <vector>
-#include <memory>
-#include "Site.h"
-#include "Transaction.h" // Added this include
-
-class DataManager
-{
-public:
-    DataManager();
-    void initializeSites();
-
-    std::shared_ptr<Site> getSite(int siteId);
-    std::vector<std::shared_ptr<Site>> getAllSites();
-
-    // Added these new method declarations
-    bool hasCommittedWrite(const std::string &variableName, long startTime);
-    void commitTransaction(std::shared_ptr<Transaction> transaction);
-    void dump();
-
-    // Methods to route read/write requests to sites
-    int read(const std::string &transactionName, const std::string &variableName, long timestamp);
-    void write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime);
-    // Pass ptr to track transaction sites
-
-    // Methods to handle site failures and recoveries
-    void failSite(int siteId);
-    void recoverSite(int siteId);
-
-private:
-    std::map<int, std::shared_ptr<Site>> sites;
-};
-
-#endif // DATA_MANAGER_H
-
-
-=== File: ./include/Variable.h ===
-----------------------------------------
-#ifndef VARIABLE_H
-#define VARIABLE_H
-
-#include <string>
-#include <vector>
-
-struct Version {
-    int value;
-    long commitTime;
-};
-
-class Variable {
-public:
-    Variable(); // Default constructor
-    Variable(const std::string& name, int initialValue);
-
-    std::string getName() const;
-    int readValue(long timestamp) const;
-    void writeValue(int value, long commitTime);
-    bool wasModifiedAfter(long timestamp) const;
-
-private:
-    std::string name;
-    std::vector<Version> versions;
-};
-
-#endif // VARIABLE_H
-
-
-
-=== File: ./include/Lock.h ===
-----------------------------------------
-#ifndef LOCK_H
-#define LOCK_H
-
 #include <iostream>
-#include <set>
-
-using namespace std;
-
-#define TOTAL_VARIABLES 20
-
-enum Lock_type
-{
-    READ_LOCK,
-    WRITE_LOCK,
-    NO_LOCK
-};
-
-class Lock
-{
-public:
-    Lock_type type;
-    // TODO: Modify the DS
-    set<int> transactions;
-    Lock(Lock_type type, set<int> transactions);
-};
-
-#endif
-
-
-=== File: ./include/Site.h ===
-----------------------------------------
-#ifndef SITE_H
-#define SITE_H
-
+#include <fstream>
+#include <memory>
 #include <string>
-#include <map>
-#include <mutex>
-#include <unordered_set>
-#include "Variable.h"
+#include "TransactionManager.h"
+#include "DataManager.h"
+#include "CommandParser.h"
 
-enum class SiteStatus
-{
-    UP,
-    DOWN,
-    RECOVERING
-};
+int main(int argc, char* argv[]) {
+    auto dataManager = std::make_shared<DataManager>();
+    TransactionManager transactionManager(dataManager);
+    CommandParser parser(transactionManager);
 
-class Site
-{
-public:
-    Site(int id);
-    int getId() const;
-    SiteStatus getStatus() const;
-    void setStatus(SiteStatus status);
+    std::istream* input = &std::cin; // Default to standard input
+    std::ifstream inputFile;
 
-    int readVariable(const std::string &variableName, long timestamp);
-    void writeVariable(const std::string &variableName, int value, long commitTime);
-
-    void fail();
-    void recover();
-    bool hasVariable(const std::string &variableName) const;
-    bool hasCommittedWrite(const std::string &variableName, long startTime) const;
-    void dump() const;
-    const std::vector<std::pair<long, long>> &getFailureTimes() const;
-
-private:
-    int id;
-    SiteStatus status;
-    std::mutex siteMutex;
-    std::map<std::string, Variable> variables;
-    std::unordered_set<std::string> unavailableVariables;
-    void initializeVariables();
-    std::vector<std::pair<long, long>> failureTimes;
-};
-
-#endif // SITE_H
-
-
-
-=== File: ./.vscode/settings.json ===
-----------------------------------------
-{
-    "files.associations": {
-        "__bit_reference": "cpp",
-        "__config": "cpp",
-        "__debug": "cpp",
-        "__errc": "cpp",
-        "__hash_table": "cpp",
-        "__locale": "cpp",
-        "__mutex_base": "cpp",
-        "__node_handle": "cpp",
-        "__split_buffer": "cpp",
-        "__threading_support": "cpp",
-        "__tree": "cpp",
-        "__verbose_abort": "cpp",
-        "array": "cpp",
-        "atomic": "cpp",
-        "bitset": "cpp",
-        "cctype": "cpp",
-        "charconv": "cpp",
-        "clocale": "cpp",
-        "cmath": "cpp",
-        "complex": "cpp",
-        "cstdarg": "cpp",
-        "cstddef": "cpp",
-        "cstdint": "cpp",
-        "cstdio": "cpp",
-        "cstdlib": "cpp",
-        "cstring": "cpp",
-        "ctime": "cpp",
-        "cwchar": "cpp",
-        "cwctype": "cpp",
-        "deque": "cpp",
-        "exception": "cpp",
-        "fstream": "cpp",
-        "initializer_list": "cpp",
-        "iomanip": "cpp",
-        "ios": "cpp",
-        "iosfwd": "cpp",
-        "iostream": "cpp",
-        "istream": "cpp",
-        "limits": "cpp",
-        "locale": "cpp",
-        "map": "cpp",
-        "mutex": "cpp",
-        "new": "cpp",
-        "optional": "cpp",
-        "ostream": "cpp",
-        "ratio": "cpp",
-        "regex": "cpp",
-        "set": "cpp",
-        "sstream": "cpp",
-        "stdexcept": "cpp",
-        "streambuf": "cpp",
-        "string": "cpp",
-        "string_view": "cpp",
-        "system_error": "cpp",
-        "tuple": "cpp",
-        "typeinfo": "cpp",
-        "unordered_map": "cpp",
-        "variant": "cpp",
-        "vector": "cpp",
-        "algorithm": "cpp",
-        "functional": "cpp",
-        "unordered_set": "cpp",
-        "bit": "cpp",
-        "*.tcc": "cpp",
-        "chrono": "cpp",
-        "compare": "cpp",
-        "concepts": "cpp",
-        "condition_variable": "cpp",
-        "iterator": "cpp",
-        "memory": "cpp",
-        "memory_resource": "cpp",
-        "numeric": "cpp",
-        "random": "cpp",
-        "type_traits": "cpp",
-        "utility": "cpp",
-        "format": "cpp",
-        "numbers": "cpp",
-        "semaphore": "cpp",
-        "span": "cpp",
-        "stop_token": "cpp",
-        "text_encoding": "cpp",
-        "thread": "cpp"
+    // If filename provided as command line argument
+    if (argc > 1) {
+        inputFile.open(argv[1]);
+        if (!inputFile.is_open()) {
+            std::cerr << "Failed to open input file '" << argv[1] << "'.\n";
+            return 1;
+        }
+        input = &inputFile;
     }
+
+    std::string command;
+    while (std::getline(*input, command)) {
+        // Skip empty lines or comments
+        if (command.empty() || command[0] == '/') {
+            continue;
+        }
+
+        // Process each command immediately
+        parser.parseCommand(command);
+
+        // Flush output after each command to ensure sequential output
+        std::cout.flush();
+    }
+
+    if (inputFile.is_open()) {
+        inputFile.close();
+    }
+
+    return 0;
 }
 
 

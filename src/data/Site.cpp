@@ -139,8 +139,19 @@ void Site::recover()
     {
         failureTimes.back().second = recoverTime;
     }
-    // Mark variables as unavailable as before
+
+    // Mark even variables as unavailable
+    unavailableVariables.clear();
+    for (const auto &varPair : variables)
+    {
+        int varIndex = stoi(varPair.first.substr(1));
+        if (varIndex % 2 == 0) // Even variables
+        {
+            unavailableVariables.insert(varPair.first);
+        }
+    }
 }
+
 
 void Site::initializeVariables()
 {

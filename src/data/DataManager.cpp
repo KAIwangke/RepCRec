@@ -56,17 +56,18 @@ void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
 int DataManager::read(const string &transactionName, const string &variableName, long timestamp)
 {
     int varIndex = stoi(variableName.substr(1));
-    int initialValue = varIndex * 10; // Initial value for any variable xi is 10*i
 
     if (varIndex % 2 == 1)
     { // Odd variables
         int siteId = 1 + (varIndex % 10);
         auto site = sites[siteId];
-        if (site->getStatus() == SiteStatus::UP)
+
+        // Allow reads from UP and RECOVERING sites for odd variables
+        if (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING)
         {
             return site->readVariable(variableName, timestamp);
         }
-        throw runtime_error("Site " + to_string(siteId) + " is down");
+        throw runtime_error("Site " + to_string(siteId) + " is down or unavailable");
     }
     else
     { // Even variables - read from any up site
@@ -75,13 +76,22 @@ int DataManager::read(const string &transactionName, const string &variableName,
             auto site = sitePair.second;
             if (site->getStatus() == SiteStatus::UP)
             {
-                return site->readVariable(variableName, timestamp);
+                // Check if variable is available
+                try
+                {
+                    return site->readVariable(variableName, timestamp);
+                }
+                catch (const std::exception &)
+                {
+                    // Variable might be unavailable at this site, continue to next
+                    continue;
+                }
             }
         }
         throw runtime_error("No available site to read " + variableName);
     }
-    return initialValue; // Should never reach here but prevents warning
 }
+
 
 void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
 {
@@ -95,8 +105,6 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const std::str
             if (site->getStatus() == SiteStatus::UP && site->hasVariable(variableName))
             {
                 site->writeVariable(variableName, value, commitTime);
-                // Remove this line:
-                // transaction->addSiteWritten(site->getId());
             }
         }
     }
@@ -110,6 +118,7 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const std::str
         }
     }
 }
+
 
 void DataManager::failSite(int siteId)
 {
