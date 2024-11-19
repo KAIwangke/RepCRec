@@ -1,11 +1,15 @@
+// TransactionManager.cpp
 #include "TransactionManager.h"
 #include "CommandParser.h"
 #include <iostream>
-#include <chrono>
 #include <string>
 #include <regex>
+#include <atomic>
 
 using namespace std;
+
+// Initialize the static global timestamp
+std::atomic<long> TransactionManager::globalTimestamp(0);
 
 TransactionManager::TransactionManager(shared_ptr<DataManager> dm)
     : dataManager(dm) {}
@@ -27,10 +31,11 @@ namespace
 
 void TransactionManager::beginTransaction(const string &transactionName, bool isReadOnly)
 {
-    auto transaction = make_shared<Transaction>(transactionName, isReadOnly);
+    long startTime = ++globalTimestamp; // Increment and get the timestamp
+    auto transaction = make_shared<Transaction>(transactionName, isReadOnly, startTime);
     transactions[transactionName] = transaction;
     cout << "Transaction " << transactionName << " started"
-         << (isReadOnly ? " (Read-Only)" : "") << ".\n";
+         << (isReadOnly ? " (Read-Only)" : "") << " at time " << startTime << ".\n";
 }
 
 void TransactionManager::read(const string &transactionName, const string &variableName)
@@ -154,71 +159,49 @@ void TransactionManager::endTransaction(const string &transactionName)
 
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
-    // first checking if the transaction is readonly
     if (transaction->isReadOnly())
     {
+        // Read-only transactions can commit immediately
         transaction->setStatus(TransactionStatus::COMMITTED);
-        cout << transaction->getName() << " committed (Read-Only)." << endl;
+        cout << transaction->getName() << " committed (Read-Only).\n";
         return;
     }
 
     long transactionStartTime = transaction->getStartTime();
-    long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
 
-    // Check if any sites the transaction wrote to have failed
-    for (int siteId : transaction->getSitesWrittenTo())
+    // Check for read-write conflicts
+    const auto &readSet = transaction->getReadSet();
+    for (const auto &variableName : readSet)
     {
-        auto site = dataManager->getSite(siteId);
-        if (site)
+        if (dataManager->hasCommittedWrite(variableName, transactionStartTime))
         {
-            const auto &failureTimes = site->getFailureTimes();
-            for (const auto &[failTime, recoverTime] : failureTimes)
-            {
-                // If the site failed after the transaction started and before it committed
-                // and the failure interval overlaps with the transaction's lifetime
-                if (failTime <= transactionCommitTime &&
-                    (recoverTime == -1 || recoverTime >= transactionStartTime))
-                {
-                    cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
-                    abortTransaction(transaction);
-                    return;
-                }
-            }
+            cout << "Read-write conflict detected on " << variableName
+                 << " for transaction " << transaction->getName() << endl;
+            abortTransaction(transaction);
+            return;
         }
     }
 
-    // Check write-write conflicts (first-committer wins)
-    bool hasConflict = false;
+    // Check for write-write conflicts
     const auto &writeSet = transaction->getWriteSet();
-    long startTime = transaction->getStartTime();
-
-    for (auto it = writeSet.begin(); it != writeSet.end(); ++it)
+    for (const auto &write : writeSet)
     {
-        const string &variableName = it->first;
-        if (dataManager->hasCommittedWrite(variableName, startTime))
+        const string &variableName = write.first;
+        if (dataManager->hasCommittedWrite(variableName, transactionStartTime))
         {
             cout << "Write-write conflict detected on " << variableName
                  << " for transaction " << transaction->getName() << endl;
-            hasConflict = true;
-            break;
+            abortTransaction(transaction);
+            return;
         }
     }
 
-    if (hasConflict)
-    {
-        abortTransaction(transaction);
-        return;
-    }
-
-    // If no conflicts, commit the transaction
-    long commitTime = chrono::system_clock::now().time_since_epoch().count();
+    // Commit the transaction
+    long commitTime = ++globalTimestamp; // Increment and get the timestamp
     transaction->setCommitTime(commitTime);
-
-    // Write all buffered writes to database
     dataManager->commitTransaction(transaction);
-
     transaction->setStatus(TransactionStatus::COMMITTED);
-    cout << transaction->getName() << " committed." << endl;
+    cout << transaction->getName() << " committed at time " << commitTime << ".\n";
 }
 
 void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction)

@@ -1,3 +1,4 @@
+// DataManager.cpp
 #include "DataManager.h"
 #include <iostream>
 using namespace std;
@@ -92,7 +93,6 @@ int DataManager::read(const string &transactionName, const string &variableName,
     }
 }
 
-
 void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
 {
     int varIndex = stoi(variableName.substr(1));
@@ -118,7 +118,6 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const std::str
         }
     }
 }
-
 
 void DataManager::failSite(int siteId)
 {

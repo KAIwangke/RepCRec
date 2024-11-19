@@ -1,10 +1,10 @@
+// Transaction.h
 #ifndef TRANSACTION_H
 #define TRANSACTION_H
 
 #include <string>
 #include <set>
 #include <map>
-#include <chrono>
 #include <unordered_set>
 #include <vector>
 
@@ -18,7 +18,7 @@ enum class TransactionStatus
 class Transaction
 {
 public:
-    Transaction(const std::string &name, bool isReadOnly);
+    Transaction(const std::string &name, bool isReadOnly, long startTime);
 
     std::string getName() const;
     bool isReadOnly() const;
@@ -40,7 +40,7 @@ private:
     std::string name;
     bool readOnly;
     TransactionStatus status;
-    long startTime; // Use timestamp for SSI
+    long startTime; // Logical timestamp
     long commitTime;
 
     std::set<std::string> readSet;

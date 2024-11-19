@@ -1,3 +1,4 @@
+// Variable.h
 #ifndef VARIABLE_H
 #define VARIABLE_H
 
@@ -11,7 +12,7 @@ struct Version {
 
 class Variable {
 public:
-    Variable(); // Default constructor
+    Variable();
     Variable(const std::string& name, int initialValue);
 
     std::string getName() const;

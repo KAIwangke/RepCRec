@@ -1,9 +1,12 @@
+// Site.cpp
 #include "Site.h"
+#include "TransactionManager.h" // To access globalTimestamp
 #include <iostream>
-#include <chrono>
 #include <string>
 #include <algorithm>
+
 using namespace std;
+
 
 Site::Site(int id) : id(id), status(SiteStatus::UP)
 {
@@ -25,7 +28,6 @@ void Site::setStatus(SiteStatus status)
     this->status = status;
 }
 
-// Fixed: Added const qualifier to match the header declaration
 bool Site::hasCommittedWrite(const string &variableName, long startTime) const
 {
     auto it = variables.find(variableName);
@@ -72,10 +74,9 @@ void Site::fail()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::DOWN;
-    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
+    long failTime = ++TransactionManager::globalTimestamp;
     failureTimes.emplace_back(failTime, -1); // -1 indicates not yet recovered
     unavailableVariables.clear();
-    // Additional logic if needed
 }
 
 void Site::dump() const
@@ -89,38 +90,16 @@ void Site::dump() const
 
     bool hasModifiedVars = false;
 
-    // Check for and print modified odd variables at this site
+    // Check for and print modified variables at this site
     for (const auto &pair : variables)
     {
         string varName = pair.first;
-        int varIndex = stoi(varName.substr(1));
-        if (varIndex % 2 == 1)
-        { // odd variable
-            int value = pair.second.readValue(chrono::system_clock::now().time_since_epoch().count());
-            int initialValue = varIndex * 10;
-            if (value != initialValue)
-            {
-                cout << varName << ": " << value << endl;
-                hasModifiedVars = true;
-            }
-        }
-    }
-
-    // Check for and print modified even variables
-    for (const auto &pair : variables)
-    {
-        string varName = pair.first;
-        int varIndex = stoi(varName.substr(1));
-        if (varIndex % 2 == 0)
-        { // even variable
-            int value = pair.second.readValue(chrono::system_clock::now().time_since_epoch().count());
-            int initialValue = varIndex * 10;
-            if (value != initialValue)
-            {
-                cout << varName << ": " << value << " at all sites" << endl;
-                hasModifiedVars = true;
-                break; // Only need to show once for replicated variables
-            }
+        int value = pair.second.readValue(TransactionManager::globalTimestamp.load());
+        int initialValue = stoi(varName.substr(1)) * 10;
+        if (value != initialValue)
+        {
+            cout << varName << ": " << value << endl;
+            hasModifiedVars = true;
         }
     }
 
@@ -134,7 +113,7 @@ void Site::recover()
 {
     std::lock_guard<std::mutex> lock(siteMutex);
     status = SiteStatus::RECOVERING;
-    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
+    long recoverTime = ++TransactionManager::globalTimestamp;
     if (!failureTimes.empty() && failureTimes.back().second == -1)
     {
         failureTimes.back().second = recoverTime;
@@ -151,7 +130,6 @@ void Site::recover()
         }
     }
 }
-
 
 void Site::initializeVariables()
 {
