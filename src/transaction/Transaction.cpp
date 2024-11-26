@@ -52,3 +52,12 @@ const std::unordered_set<int> &Transaction::getSitesWrittenTo() const
 {
     return sitesWrittenTo;
 }
+void Transaction::addDependency(const std::string &transactionName)
+{
+    dependencySet.insert(transactionName);
+}
+
+const std::set<std::string> &Transaction::getDependencies() const
+{
+    return dependencySet;
+}

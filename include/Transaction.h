@@ -36,12 +36,17 @@ public:
     void addSitesWritten(const std::vector<int> &siteIds);
     const std::unordered_set<int> &getSitesWrittenTo() const;
 
+    void addDependency(const std::string &transactionName);
+    const std::set<std::string> &getDependencies() const;
+
 private:
     std::string name;
     bool readOnly;
     TransactionStatus status;
     long startTime; // Use timestamp for SSI
     long commitTime;
+
+    std::set<std::string> dependencySet;
 
     std::set<std::string> readSet;
     std::map<std::string, int> writeSet;

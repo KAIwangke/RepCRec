@@ -27,6 +27,12 @@ namespace
 
 void TransactionManager::beginTransaction(const string &transactionName, bool isReadOnly)
 {
+    if (transactions.find(transactionName) != transactions.end())
+    {
+        cout << "Transaction " << transactionName << " already exists.\n";
+        return;
+    }
+
     auto transaction = make_shared<Transaction>(transactionName, isReadOnly);
     transactions[transactionName] = transaction;
     cout << "Transaction " << transactionName << " started"
@@ -56,6 +62,7 @@ void TransactionManager::read(const string &transactionName, const string &varia
         int value = dataManager->read(transactionName, variableName, transaction->getStartTime());
         transaction->addReadVariable(variableName);
         cout << variableName << ": " << value << endl;
+        readTable[variableName].insert(transaction->getName());
     }
     catch (const exception &e)
     {
@@ -149,7 +156,7 @@ void TransactionManager::endTransaction(const string &transactionName)
     validateAndCommit(transaction);
 
     // Clean up transaction entry
-    transactions.erase(it);
+    // transactions.erase(it);
 }
 
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
@@ -210,6 +217,50 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         return;
     }
 
+    // Update readTable and writeTable
+    for (const auto &variableName : transaction->getReadSet())
+    {
+        readTable[variableName].insert(transaction->getName());
+    }
+
+    for (const auto &[variableName, value] : transaction->getWriteSet())
+    {
+        // For each reader of this variable, add a dependency
+        for (const auto &readerTransactionName : readTable[variableName])
+        {
+            if (readerTransactionName != transaction->getName())
+            {
+                auto readerTransaction = transactions[readerTransactionName];
+                readerTransaction->addDependency(transaction->getName());
+            }
+        }
+        writeTable[variableName].insert(transaction->getName());
+    }
+
+    // For variables read by this transaction, check for write dependencies
+    for (const auto &variableName : transaction->getReadSet())
+    {
+        for (const auto &writerTransactionName : writeTable[variableName])
+        {
+            if (writerTransactionName != transaction->getName())
+            {
+                auto writerTransaction = transactions[writerTransactionName];
+                if (writerTransaction->getCommitTime() == 0 || writerTransaction->getCommitTime() > transaction->getStartTime())
+                {
+                    transaction->addDependency(writerTransactionName);
+                }
+            }
+        }
+    }
+
+    // Detect cycles
+    if (detectCycle(transaction->getName()))
+    {
+        std::cout << transaction->getName() << " aborts due to cycle in dependency graph." << std::endl;
+        abortTransaction(transaction);
+        return;
+    }
+
     // If no conflicts, commit the transaction
     long commitTime = chrono::system_clock::now().time_since_epoch().count();
     transaction->setCommitTime(commitTime);
@@ -242,4 +293,38 @@ void TransactionManager::recoverSite(int siteId)
 {
     dataManager->recoverSite(siteId);
     cout << "Site " << siteId << " recovered.\n";
+}
+
+bool TransactionManager::detectCycle(const std::string &transactionName)
+{
+    std::set<std::string> visited;
+    std::set<std::string> recursionStack;
+    return dfs(transactionName, visited, recursionStack);
+}
+
+bool TransactionManager::dfs(const std::string &transactionName, std::set<std::string> &visited, std::set<std::string> &recursionStack)
+{
+    if (recursionStack.count(transactionName))
+    {
+        // Cycle detected
+        return true;
+    }
+    if (visited.count(transactionName))
+    {
+        // Already visited
+        return false;
+    }
+    visited.insert(transactionName);
+    recursionStack.insert(transactionName);
+
+    auto transaction = transactions[transactionName];
+    for (const auto &dep : transaction->getDependencies())
+    {
+        if (dfs(dep, visited, recursionStack))
+        {
+            return true;
+        }
+    }
+    recursionStack.erase(transactionName);
+    return false;
 }
