@@ -25,9 +25,15 @@ private:
     std::map<std::string, std::shared_ptr<Transaction>> transactions;
     std::shared_ptr<DataManager> dataManager; // Interface to Data Managers
 
+    std::map<std::string, std::set<std::string>> readTable; // variableName -> transactions that read it
+    std::map<std::string, std::set<std::string>> writeTable;
+
     // Helper methods
     void validateAndCommit(std::shared_ptr<Transaction> transaction);
     void abortTransaction(std::shared_ptr<Transaction> transaction);
+
+    bool detectCycle(const std::string &transactionName);
+    bool dfs(const std::string &transactionName, std::set<std::string> &visited, std::set<std::string> &recursionStack);
 };
 
 #endif // TRANSACTION_MANAGER_H
