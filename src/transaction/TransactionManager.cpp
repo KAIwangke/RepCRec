@@ -39,39 +39,36 @@ void TransactionManager::beginTransaction(const string &transactionName, bool is
          << (isReadOnly ? " (Read-Only)" : "") << ".\n";
 }
 
-void TransactionManager::read(const string &transactionName, const string &variableName)
-{
+void TransactionManager::read(const string& transactionName, const string& variableName) {
     auto it = transactions.find(transactionName);
-    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE)
-    {
+    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE) {
         cout << "Transaction " << transactionName << " is not active.\n";
         return;
     }
 
     auto transaction = it->second;
     int varIndex = getVarIndex(variableName);
-    if (varIndex < 1 || varIndex > 20)
-    {
+    if (varIndex < 1 || varIndex > 20) {
         cout << "Invalid variable name: " << variableName << endl;
         abortTransaction(transaction);
         return;
     }
 
-    try
-    {
+    try {
         int value = dataManager->read(transactionName, variableName, transaction->getStartTime());
         transaction->addReadVariable(variableName);
         cout << variableName << ": " << value << endl;
         readTable[variableName].insert(transaction->getName());
     }
-    catch (const exception &e)
-    {
-        cout << "Read failed for transaction " << transactionName
-             << " on variable " << variableName << ": " << e.what() << endl;
+    catch (const runtime_error& e) {
+        string errorMsg = e.what();
+        if (errorMsg == "Transaction must wait") {
+            return;  // Don't abort - transaction is waiting
+        }
+        // For any other error, abort the transaction
         abortTransaction(transaction);
     }
 }
-
 void TransactionManager::write(const string &transactionName, const string &variableName, int value)
 {
     auto it = transactions.find(transactionName);
@@ -286,13 +283,11 @@ void TransactionManager::dump() const
 void TransactionManager::failSite(int siteId)
 {
     dataManager->failSite(siteId);
-    cout << "Site " << siteId << " failed.\n";
 }
 
 void TransactionManager::recoverSite(int siteId)
 {
     dataManager->recoverSite(siteId);
-    cout << "Site " << siteId << " recovered.\n";
 }
 
 bool TransactionManager::detectCycle(const std::string &transactionName)

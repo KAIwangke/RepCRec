@@ -41,22 +41,20 @@ bool Site::hasVariable(const string &variableName) const
     return variables.find(variableName) != variables.end();
 }
 
-int Site::readVariable(const std::string &variableName, long timestamp)
-{
+int Site::readVariable(const std::string &variableName, long timestamp) {
     std::lock_guard<std::mutex> lock(siteMutex);
 
-    if (status == SiteStatus::DOWN)
-    {
+    if (status == SiteStatus::DOWN) {
         throw std::runtime_error("Site is down.");
     }
 
-    // If variable is unavailable for reading, throw exception
-    if (unavailableVariables.find(variableName) != unavailableVariables.end())
-    {
-        throw std::runtime_error("Variable " + variableName + " is unavailable for reading at site " + std::to_string(id));
+    // Allow reading even if variable is unavailable if we have a version before timestamp
+    auto it = variables.find(variableName);
+    if (it != variables.end()) {
+        return it->second.readValue(timestamp);
     }
 
-    return variables[variableName].readValue(timestamp);
+    throw std::runtime_error("Variable " + variableName + " not found");
 }
 
 void Site::writeVariable(const std::string &variableName, int value, long commitTime)
@@ -68,15 +66,7 @@ void Site::writeVariable(const std::string &variableName, int value, long commit
     unavailableVariables.erase(variableName);
 }
 
-void Site::fail()
-{
-    std::lock_guard<std::mutex> lock(siteMutex);
-    status = SiteStatus::DOWN;
-    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
-    failureTimes.emplace_back(failTime, -1); // -1 indicates not yet recovered
-    unavailableVariables.clear();
-    // Additional logic if needed
-}
+
 
 void Site::dump() const
 {
@@ -130,27 +120,6 @@ void Site::dump() const
     }
 }
 
-void Site::recover()
-{
-    std::lock_guard<std::mutex> lock(siteMutex);
-    status = SiteStatus::RECOVERING;
-    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
-    if (!failureTimes.empty() && failureTimes.back().second == -1)
-    {
-        failureTimes.back().second = recoverTime;
-    }
-
-    // Mark even variables as unavailable
-    unavailableVariables.clear();
-    for (const auto &varPair : variables)
-    {
-        int varIndex = stoi(varPair.first.substr(1));
-        if (varIndex % 2 == 0) // Even variables
-        {
-            unavailableVariables.insert(varPair.first);
-        }
-    }
-}
 
 
 void Site::initializeVariables()
@@ -179,4 +148,38 @@ void Site::initializeVariables()
 const std::vector<std::pair<long, long>> &Site::getFailureTimes() const
 {
     return failureTimes;
+}
+
+
+void Site::fail() {
+    std::unique_lock<std::mutex> lock(siteMutex);
+    if (status == SiteStatus::DOWN) {
+        // Already down, don't do anything
+        return;
+    }
+    status = SiteStatus::DOWN;
+    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
+    failureTimes.emplace_back(failTime, -1);
+    unavailableVariables.clear();
+}
+
+void Site::recover() {
+    std::unique_lock<std::mutex> lock(siteMutex);
+    if (status != SiteStatus::DOWN) {
+        // Not down, can't recover
+        return;
+    }
+    status = SiteStatus::RECOVERING;
+    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
+    if (!failureTimes.empty() && failureTimes.back().second == -1) {
+        failureTimes.back().second = recoverTime;
+    }
+
+    // Mark replicated variables as unavailable until a new write
+    for (const auto &varPair : variables) {
+        int varIndex = stoi(varPair.first.substr(1));
+        if (varIndex % 2 == 0) {
+            unavailableVariables.insert(varPair.first);
+        }
+    }
 }
