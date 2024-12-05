@@ -1,3 +1,10 @@
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-12-05 20:25:29
+ * @ Modified time: 2024-12-05 21:32:36
+ */
+
 #include "TransactionManager.h"
 #include "CommandParser.h"
 #include <iostream>

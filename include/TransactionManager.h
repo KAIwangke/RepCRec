@@ -1,3 +1,10 @@
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-28 21:40:54
+ * @ Modified time: 2024-12-05 21:33:11
+ */
+
 #ifndef TRANSACTION_MANAGER_H
 #define TRANSACTION_MANAGER_H
 

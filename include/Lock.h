@@ -1,3 +1,10 @@
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:19
+ */
+
 #ifndef LOCK_H
 #define LOCK_H
 
