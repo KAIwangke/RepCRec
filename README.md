@@ -86,6 +86,29 @@ end(T2)
 dump()
 ```
 
+## ReproZip and Reproduction of the Environment
+- A ReproZip package repcrecExperiment.rpz is provided to allow you to reproduce the environment and execution.
+
+### Prerequisites for ReproZip:
+- Install ReproZip and Reprounzip:
+``` bash
+pip3 install reprozip reprounzip
+```
+
+### Reproducing the Experiment:
+- Setup the Environment with Docker (recommended):
+``` bash
+reprounzip docker setup repcrecExperiment.rpz myexperiment/
+```
+- This will create a Docker image and a container configuration in the myexperiment/ directory.
+
+- Run the Experiment:
+``` bash
+reprounzip docker run myexperiment/
+```
+- This will execute the recorded commands inside the Docker container. You should see output similar to the environment in which the experiment was originally traced.
+
+
 ## Implementation Details
 
 ### Transaction Management
