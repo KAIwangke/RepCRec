@@ -15,6 +15,8 @@ A C++ implementation of a distributed database system with replicated concurrenc
 
 ## System Architecture
 
+https://yuml.me/060ba9a8.png![image](https://github.com/user-attachments/assets/7be2ce91-b8e0-4bd9-8edd-c659b5059068)
+
 ### Core Components
 1. **TransactionManager**: Coordinates transaction execution and ensures ACID properties
 2. **DataManager**: Manages distributed sites and data access
