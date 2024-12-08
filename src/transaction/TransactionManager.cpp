@@ -1,3 +1,9 @@
+/**
+ * @   Author: Ke Wang & Siwen Tao
+ * @   Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @   Modified time: 2024-12-08 22:22:55
+ */
+
 #include "TransactionManager.h"
 #include "CommandParser.h"
 #include <iostream>
@@ -7,12 +13,19 @@
 
 using namespace std;
 
+// Description: Initializes TransactionManager with data manager
+// Input: dm - shared pointer to DataManager
+// Output: None
+// Side Effects: Sets up transaction manager state
 TransactionManager::TransactionManager(shared_ptr<DataManager> dm)
     : dataManager(dm) {}
 
 namespace
 {
-    // Helper function to extract variable index from name (e.g., "x3" -> 3)
+    // Description: Extracts numeric index from variable name
+    // Input: varName - string (e.g., "x3")
+    // Output: integer index or -1 if invalid
+    // Side Effects: None    
     int getVarIndex(const string &varName)
     {
         regex rx("x(\\d+)");
@@ -25,6 +38,10 @@ namespace
     }
 }
 
+// Description: Starts a new transaction
+// Input: transactionName - identifier, isReadOnly - read-only flag
+// Output: None
+// Side Effects: Creates new transaction or prints error if exists
 void TransactionManager::beginTransaction(const string &transactionName, bool isReadOnly)
 {
     if (transactions.find(transactionName) != transactions.end())
@@ -39,6 +56,10 @@ void TransactionManager::beginTransaction(const string &transactionName, bool is
          << (isReadOnly ? " (Read-Only)" : "") << ".\n";
 }
 
+// Description: Executes read operation for transaction
+// Input: transactionName - transaction ID, variableName - variable to read
+// Output: None
+// Side Effects: Updates read sets, prints value or errors, may abort transaction
 void TransactionManager::read(const string& transactionName, const string& variableName) {
     auto it = transactions.find(transactionName);
     if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE) {
@@ -63,12 +84,16 @@ void TransactionManager::read(const string& transactionName, const string& varia
     catch (const runtime_error& e) {
         string errorMsg = e.what();
         if (errorMsg == "Transaction must wait") {
-            return;  // Don't abort - transaction is waiting
+            return;  
         }
-        // For any other error, abort the transaction
         abortTransaction(transaction);
     }
 }
+
+// Description: Processes write operation for transaction
+// Input: transactionName - transaction ID, variableName - variable to write, value - new value
+// Output: None
+// Side Effects: Buffers write, updates site lists, may abort transaction
 void TransactionManager::write(const string &transactionName, const string &variableName, int value)
 {
     auto it = transactions.find(transactionName);
@@ -94,13 +119,11 @@ void TransactionManager::write(const string &transactionName, const string &vari
         return;
     }
 
-    // Determine which sites this write would affect
     std::vector<int> siteIdsToWrite;
     if (varIndex % 2 == 0)
     { // Even variable, replicated
         for (const auto &site : dataManager->getAllSites())
         {
-            // Include only sites that are UP
             if (site->getStatus() == SiteStatus::UP)
             {
                 if (site->hasVariable(variableName))
@@ -114,7 +137,6 @@ void TransactionManager::write(const string &transactionName, const string &vari
     { // Odd variable, located at one site
         int siteId = 1 + (varIndex % 10);
         auto site = dataManager->getSite(siteId);
-        // Include only if the site is UP
         if (site && site->getStatus() == SiteStatus::UP)
         {
             if (site->hasVariable(variableName))
@@ -124,15 +146,17 @@ void TransactionManager::write(const string &transactionName, const string &vari
         }
     }
 
-    // Update the transaction's sitesWrittenTo set
     transaction->addSitesWritten(siteIdsToWrite);
 
-    // Buffer the write
     transaction->addWriteVariable(variableName, value);
     cout << "Write of " << value << " to " << variableName
          << " buffered for transaction " << transactionName << endl;
 }
 
+// Description: Completes transaction execution
+// Input: transactionName - transaction to end
+// Output: None
+// Side Effects: Validates and commits/aborts transaction
 void TransactionManager::endTransaction(const string &transactionName)
 {
     auto it = transactions.find(transactionName);
@@ -149,13 +173,14 @@ void TransactionManager::endTransaction(const string &transactionName)
         return;
     }
 
-    // Validate and commit/abort the transaction
     validateAndCommit(transaction);
 
-    // Clean up transaction entry
-    // transactions.erase(it);
 }
 
+// Description: Validates transaction and attempts to commit
+// Input: transaction - pointer to transaction
+// Output: None
+// Side Effects: Updates transaction status, commits changes or aborts
 void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
     // first checking if the transaction is readonly
@@ -169,7 +194,6 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
     long transactionStartTime = transaction->getStartTime();
     long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
 
-    // Check if any sites the transaction wrote to have failed
     for (int siteId : transaction->getSitesWrittenTo())
     {
         auto site = dataManager->getSite(siteId);
@@ -178,8 +202,6 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
             const auto &failureTimes = site->getFailureTimes();
             for (const auto &[failTime, recoverTime] : failureTimes)
             {
-                // If the site failed after the transaction started and before it committed
-                // and the failure interval overlaps with the transaction's lifetime
                 if (failTime <= transactionCommitTime &&
                     (recoverTime == -1 || recoverTime >= transactionStartTime))
                 {
@@ -214,7 +236,6 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         return;
     }
 
-    // Update readTable and writeTable
     for (const auto &variableName : transaction->getReadSet())
     {
         readTable[variableName].insert(transaction->getName());
@@ -222,7 +243,6 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 
     for (const auto &[variableName, value] : transaction->getWriteSet())
     {
-        // For each reader of this variable, add a dependency
         for (const auto &readerTransactionName : readTable[variableName])
         {
             if (readerTransactionName != transaction->getName())
@@ -234,7 +254,6 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         writeTable[variableName].insert(transaction->getName());
     }
 
-    // For variables read by this transaction, check for write dependencies
     for (const auto &variableName : transaction->getReadSet())
     {
         for (const auto &writerTransactionName : writeTable[variableName])
@@ -262,34 +281,53 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
     long commitTime = chrono::system_clock::now().time_since_epoch().count();
     transaction->setCommitTime(commitTime);
 
-    // Write all buffered writes to database
     dataManager->commitTransaction(transaction);
 
     transaction->setStatus(TransactionStatus::COMMITTED);
     cout << transaction->getName() << " committed." << endl;
 }
 
+// Description: Aborts a transaction
+// Input: transaction - pointer to transaction to abort
+// Output: None
+// Side Effects: Sets status to ABORTED, prints message
 void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction)
 {
     transaction->setStatus(TransactionStatus::ABORTED);
     cout << "Transaction " << transaction->getName() << " aborted.\n";
 }
 
+// Description: Outputs current database state
+// Input: None
+// Output: None
+// Side Effects: Prints site information to console
 void TransactionManager::dump() const
 {
     dataManager->dump();
 }
 
+// Description: Marks site as failed
+// Input: siteId - ID of site to fail 
+// Output: None
+// Side Effects: Updates site status, may affect transactions
 void TransactionManager::failSite(int siteId)
 {
     dataManager->failSite(siteId);
 }
 
+// Description: Recovers failed site
+// Input: siteId - ID of site to recover
+// Output: None
+// Side Effects: Updates site status, processes pending reads
 void TransactionManager::recoverSite(int siteId)
 {
     dataManager->recoverSite(siteId);
 }
 
+// Description: Checks for cycles in transaction dependencies
+// Input: transactionName - starting transaction for check
+// Output: bool - true if cycle found
+// Side Effects: None
 bool TransactionManager::detectCycle(const std::string &transactionName)
 {
     std::set<std::string> visited;
@@ -297,6 +335,10 @@ bool TransactionManager::detectCycle(const std::string &transactionName)
     return dfs(transactionName, visited, recursionStack);
 }
 
+// Description: Performs DFS for cycle detection
+// Input: transactionName - current node, visited/recursionStack - tracking sets
+// Output: bool - true if cycle found
+// Side Effects: Updates tracking sets
 bool TransactionManager::dfs(const std::string &transactionName, std::set<std::string> &visited, std::set<std::string> &recursionStack)
 {
     if (recursionStack.count(transactionName))

@@ -1,12 +1,26 @@
+/**
+ * @   Author: Ke Wang & Siwen Tao
+ * @   Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @   Modified time: 2024-12-08 22:17:45
+ */
+
 #include "DataManager.h"
 #include <iostream>
 using namespace std;
 
+// Description: Constructor that sets up the distributed database system
+// Input: None
+// Output: None
+// Side Effects: Initializes all 10 database sites
 DataManager::DataManager()
 {
     initializeSites();
 }
 
+// Description: Creates the initial set of database sites
+// Input: None
+// Output: None
+// Side Effects: Creates 10 Site objects and stores them in sites map
 void DataManager::initializeSites()
 {
     for (int i = 1; i <= 10; ++i)
@@ -15,11 +29,19 @@ void DataManager::initializeSites()
     }
 }
 
+// Description: Retrieves a specific site by its ID
+// Input: siteId (int)
+// Output: Shared pointer to Site object
+// Side Effects: None
 std::shared_ptr<Site> DataManager::getSite(int siteId)
 {
     return sites[siteId];
 }
 
+// Description: Returns all database sites in the system
+// Input: None
+// Output: Vector of Site pointers
+// Side Effects: None
 std::vector<std::shared_ptr<Site>> DataManager::getAllSites()
 {
     std::vector<std::shared_ptr<Site>> siteList;
@@ -30,6 +52,10 @@ std::vector<std::shared_ptr<Site>> DataManager::getAllSites()
     return siteList;
 }
 
+// Description: Checks if any site has a committed write for a variable after given time
+// Input: variableName (string), startTime (long)
+// Output: Boolean indicating if write exists
+// Side Effects: None
 bool DataManager::hasCommittedWrite(const std::string &variableName, long startTime)
 {
     for (const auto &sitePair : sites)
@@ -43,6 +69,10 @@ bool DataManager::hasCommittedWrite(const std::string &variableName, long startT
     return false;
 }
 
+// Description: Performs final commit of all pending writes in a transaction
+// Input: transaction pointer
+// Output: None
+// Side Effects: Writes all transaction's pending writes to appropriate sites
 void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
 {
     for (const auto &write : transaction->getWriteSet())
@@ -53,8 +83,10 @@ void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
     }
 }
 
-
-
+// Description: Writes variable to either all sites or single site based on variable type
+// Input: transaction pointer, variableName, value, commitTime
+// Output: None
+// Side Effects: Updates variable value across relevant sites
 void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
 {
     int varIndex = stoi(variableName.substr(1));
@@ -81,7 +113,10 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const std::str
     }
 }
 
-
+// Description: Outputs current state of all database sites
+// Input: None
+// Output: None
+// Side Effects: Prints state of all sites to console
 void DataManager::dump()
 {
     for (const auto &sitePair : sites)
@@ -90,11 +125,12 @@ void DataManager::dump()
     }
 }
 
-#include "DataManager.h"
-#include <iostream>
-using namespace std;
-
-bool DataManager::hasSiteStableHistory(std::shared_ptr<Site> site, long timestamp) const {
+// Description: Verifies if site has consistent history at given timestamp
+// Input: site pointer, timestamp
+// Output: Boolean indicating stability
+// Side Effects: None
+bool DataManager::hasSiteStableHistory(std::shared_ptr<Site> site, long timestamp) const 
+{
     if (!site || site->getStatus() == SiteStatus::DOWN) {
         return false;
     }
@@ -109,7 +145,12 @@ bool DataManager::hasSiteStableHistory(std::shared_ptr<Site> site, long timestam
     return true;
 }
 
-bool DataManager::hasContinuousHistory(std::shared_ptr<Site> site, long fromTime, long toTime) const {
+// Description: Checks if site was continuously up during time period
+// Input: site pointer, fromTime, toTime
+// Output: Boolean indicating continuous uptime
+// Side Effects: None
+bool DataManager::hasContinuousHistory(std::shared_ptr<Site> site, long fromTime, long toTime) const 
+{
     const auto& failureTimes = site->getFailureTimes();
     for (const auto& ft : failureTimes) {
         // Check if any failure interval overlaps with [fromTime, toTime]
@@ -120,7 +161,12 @@ bool DataManager::hasContinuousHistory(std::shared_ptr<Site> site, long fromTime
     return true;
 }
 
-int DataManager::read(const string& transactionName, const string& variableName, long timestamp) {
+// Description: Reads variable from appropriate site based on variable type
+// Input: transactionName, variableName, timestamp
+// Output: Integer value of variable
+// Side Effects: May add to waitingReads queue, throws exceptions
+int DataManager::read(const string& transactionName, const string& variableName, long timestamp) 
+{
     int varIndex = stoi(variableName.substr(1));
 
     if (varIndex % 2 == 1) { // Odd variables
@@ -173,7 +219,13 @@ int DataManager::read(const string& transactionName, const string& variableName,
 
     throw runtime_error("No available site to read " + variableName);
 }
-void DataManager::recoverSite(int siteId) {
+
+// Description: Brings a failed site back online and processes pending reads
+// Input: siteId
+// Output: None
+// Side Effects: Recovers site, processes waiting reads, prints status
+void DataManager::recoverSite(int siteId) 
+{
     auto site = getSite(siteId);
     if (!site || site->getStatus() != SiteStatus::DOWN) {
         return;
@@ -198,8 +250,12 @@ void DataManager::recoverSite(int siteId) {
     }
 }
 
-
-void DataManager::failSite(int siteId) {
+// Description: Simulates failure of a database site
+// Input: siteId
+// Output: None
+// Side Effects: Marks site as failed, prints status
+void DataManager::failSite(int siteId) 
+{
     auto site = getSite(siteId);
     if (!site) return;
     
