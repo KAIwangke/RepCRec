@@ -1,4 +1,4 @@
-Directory Contents Dump - Tue Nov 26 20:29:49 UTC 2024
+Directory Contents Dump - Sat Dec  7 22:12:41 UTC 2024
 Current Directory: /root/RepCRec
 =========================================
 
@@ -12,7 +12,6 @@ W(T1,x3,33)
 end(T1)
 R(T2,x3)
 end(T2)
-dump()
 
 
 === File: ./test/test9.txt ===
@@ -553,6 +552,13 @@ add_dependencies(${PROJECT_NAME} copy_test_files)
 
 === File: ./src/main.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:32:40
+ */
+
 #include <iostream>
 #include <fstream>
 #include <memory>
@@ -603,6 +609,13 @@ int main(int argc, char* argv[]) {
 
 === File: ./src/data/Site.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:32:59
+ */
+
 #include "Site.h"
 #include <iostream>
 #include <chrono>
@@ -646,22 +659,20 @@ bool Site::hasVariable(const string &variableName) const
     return variables.find(variableName) != variables.end();
 }
 
-int Site::readVariable(const std::string &variableName, long timestamp)
-{
+int Site::readVariable(const std::string &variableName, long timestamp) {
     std::lock_guard<std::mutex> lock(siteMutex);
 
-    if (status == SiteStatus::DOWN)
-    {
+    if (status == SiteStatus::DOWN) {
         throw std::runtime_error("Site is down.");
     }
 
-    // If variable is unavailable for reading, throw exception
-    if (unavailableVariables.find(variableName) != unavailableVariables.end())
-    {
-        throw std::runtime_error("Variable " + variableName + " is unavailable for reading at site " + std::to_string(id));
+    // Allow reading even if variable is unavailable if we have a version before timestamp
+    auto it = variables.find(variableName);
+    if (it != variables.end()) {
+        return it->second.readValue(timestamp);
     }
 
-    return variables[variableName].readValue(timestamp);
+    throw std::runtime_error("Variable " + variableName + " not found");
 }
 
 void Site::writeVariable(const std::string &variableName, int value, long commitTime)
@@ -673,15 +684,7 @@ void Site::writeVariable(const std::string &variableName, int value, long commit
     unavailableVariables.erase(variableName);
 }
 
-void Site::fail()
-{
-    std::lock_guard<std::mutex> lock(siteMutex);
-    status = SiteStatus::DOWN;
-    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
-    failureTimes.emplace_back(failTime, -1); // -1 indicates not yet recovered
-    unavailableVariables.clear();
-    // Additional logic if needed
-}
+
 
 void Site::dump() const
 {
@@ -735,27 +738,6 @@ void Site::dump() const
     }
 }
 
-void Site::recover()
-{
-    std::lock_guard<std::mutex> lock(siteMutex);
-    status = SiteStatus::RECOVERING;
-    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
-    if (!failureTimes.empty() && failureTimes.back().second == -1)
-    {
-        failureTimes.back().second = recoverTime;
-    }
-
-    // Mark even variables as unavailable
-    unavailableVariables.clear();
-    for (const auto &varPair : variables)
-    {
-        int varIndex = stoi(varPair.first.substr(1));
-        if (varIndex % 2 == 0) // Even variables
-        {
-            unavailableVariables.insert(varPair.first);
-        }
-    }
-}
 
 
 void Site::initializeVariables()
@@ -787,9 +769,49 @@ const std::vector<std::pair<long, long>> &Site::getFailureTimes() const
 }
 
 
+void Site::fail() {
+    std::unique_lock<std::mutex> lock(siteMutex);
+    if (status == SiteStatus::DOWN) {
+        // Already down, don't do anything
+        return;
+    }
+    status = SiteStatus::DOWN;
+    long failTime = std::chrono::system_clock::now().time_since_epoch().count();
+    failureTimes.emplace_back(failTime, -1);
+    unavailableVariables.clear();
+}
+
+void Site::recover() {
+    std::unique_lock<std::mutex> lock(siteMutex);
+    if (status != SiteStatus::DOWN) {
+        // Not down, can't recover
+        return;
+    }
+    status = SiteStatus::RECOVERING;
+    long recoverTime = std::chrono::system_clock::now().time_since_epoch().count();
+    if (!failureTimes.empty() && failureTimes.back().second == -1) {
+        failureTimes.back().second = recoverTime;
+    }
+
+    // Mark replicated variables as unavailable until a new write
+    for (const auto &varPair : variables) {
+        int varIndex = stoi(varPair.first.substr(1));
+        if (varIndex % 2 == 0) {
+            unavailableVariables.insert(varPair.first);
+        }
+    }
+}
+
 
 === File: ./src/data/DataManager.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:02
+ */
+
 #include "DataManager.h"
 #include <iostream>
 using namespace std;
@@ -845,44 +867,6 @@ void DataManager::commitTransaction(std::shared_ptr<Transaction> transaction)
     }
 }
 
-int DataManager::read(const string &transactionName, const string &variableName, long timestamp)
-{
-    int varIndex = stoi(variableName.substr(1));
-
-    if (varIndex % 2 == 1)
-    { // Odd variables
-        int siteId = 1 + (varIndex % 10);
-        auto site = sites[siteId];
-
-        // Allow reads from UP and RECOVERING sites for odd variables
-        if (site->getStatus() == SiteStatus::UP || site->getStatus() == SiteStatus::RECOVERING)
-        {
-            return site->readVariable(variableName, timestamp);
-        }
-        throw runtime_error("Site " + to_string(siteId) + " is down or unavailable");
-    }
-    else
-    { // Even variables - read from any up site
-        for (auto &sitePair : sites)
-        {
-            auto site = sitePair.second;
-            if (site->getStatus() == SiteStatus::UP)
-            {
-                // Check if variable is available
-                try
-                {
-                    return site->readVariable(variableName, timestamp);
-                }
-                catch (const std::exception &)
-                {
-                    // Variable might be unavailable at this site, continue to next
-                    continue;
-                }
-            }
-        }
-        throw runtime_error("No available site to read " + variableName);
-    }
-}
 
 
 void DataManager::write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime)
@@ -912,15 +896,6 @@ void DataManager::write(std::shared_ptr<Transaction> transaction, const std::str
 }
 
 
-void DataManager::failSite(int siteId)
-{
-    auto site = getSite(siteId);
-    if (site)
-    {
-        site->fail();
-    }
-}
-
 void DataManager::dump()
 {
     for (const auto &sitePair : sites)
@@ -929,18 +904,136 @@ void DataManager::dump()
     }
 }
 
-void DataManager::recoverSite(int siteId)
-{
+#include "DataManager.h"
+#include <iostream>
+using namespace std;
+
+bool DataManager::hasSiteStableHistory(std::shared_ptr<Site> site, long timestamp) const {
+    if (!site || site->getStatus() == SiteStatus::DOWN) {
+        return false;
+    }
+
+    const auto& failureTimes = site->getFailureTimes();
+    for (const auto& ft : failureTimes) {
+        // Check if there was a failure between transaction start and current time
+        if (ft.first <= timestamp && (ft.second == -1 || ft.second > timestamp)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool DataManager::hasContinuousHistory(std::shared_ptr<Site> site, long fromTime, long toTime) const {
+    const auto& failureTimes = site->getFailureTimes();
+    for (const auto& ft : failureTimes) {
+        // Check if any failure interval overlaps with [fromTime, toTime]
+        if (ft.first <= toTime && (ft.second == -1 || ft.second >= fromTime)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int DataManager::read(const string& transactionName, const string& variableName, long timestamp) {
+    int varIndex = stoi(variableName.substr(1));
+
+    if (varIndex % 2 == 1) { // Odd variables
+        int siteId = 1 + (varIndex % 10);
+        auto site = sites[siteId];
+        if (site->getStatus() == SiteStatus::DOWN) {
+            throw runtime_error("Site " + to_string(siteId) + " is down");
+        }
+        return site->readVariable(variableName, timestamp);
+    }
+    else { // Even variables
+        // First find if there is any site that has a valid history of the variable
+        long lastWriteTime = -1;
+        bool foundValidVersion = false;
+        
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->hasVariable(variableName) && 
+                hasContinuousHistory(site, lastWriteTime, timestamp)) {
+                foundValidVersion = true;
+                break;
+            }
+        }
+
+        // If no site has valid version, abort immediately
+        if (!foundValidVersion) {
+            throw runtime_error("No valid version of " + variableName);
+        }
+
+        // Try to read from an up site with valid version
+        for (auto& sitePair : sites) {
+            auto site = sitePair.second;
+            if (site->getStatus() == SiteStatus::UP &&
+                site->hasVariable(variableName) &&
+                hasContinuousHistory(site, lastWriteTime, timestamp)) {
+                try {
+                    return site->readVariable(variableName, timestamp);
+                } catch (...) {
+                    continue;
+                }
+            }
+        }
+
+        // If we found a valid version but can't access it right now, wait
+        cout << "Transaction " << transactionName << " waits for reading "
+             << variableName << endl;
+        waitingReads.push_back({transactionName, variableName, timestamp});
+        throw runtime_error("Transaction must wait");
+    }
+
+    throw runtime_error("No available site to read " + variableName);
+}
+void DataManager::recoverSite(int siteId) {
     auto site = getSite(siteId);
-    if (site)
-    {
-        site->recover();
+    if (!site || site->getStatus() != SiteStatus::DOWN) {
+        return;
+    }
+
+    site->recover();
+    cout << "Site " << siteId << " recovered." << endl;
+
+    // Process waiting reads
+    auto it = waitingReads.begin();
+    while (it != waitingReads.end()) {
+        if (site->hasVariable(it->variableName) && 
+            hasSiteStableHistory(site, it->timestamp)) {
+            try {
+                int value = site->readVariable(it->variableName, it->timestamp);
+                cout << it->variableName << ": " << value << endl;
+                it = waitingReads.erase(it);
+                continue;
+            } catch (...) {}
+        }
+        ++it;
     }
 }
 
 
+void DataManager::failSite(int siteId) {
+    auto site = getSite(siteId);
+    if (!site) return;
+    
+    if (site->getStatus() != SiteStatus::DOWN) {
+        site->fail();
+        cout << "Site " << siteId << " failed." << endl;
+    }
+}
+
+
+
 === File: ./src/data/Variable.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:32:57
+ */
+
 #include "Variable.h"
 
 
@@ -991,6 +1084,13 @@ void Variable::writeValue(int value, long commitTime) {
 
 === File: ./src/LockTable.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:32:27
+ */
+
 #include "Lock.h"
 
 Lock::Lock(Lock_type type, set<int> transactions)
@@ -1002,6 +1102,13 @@ Lock::Lock(Lock_type type, set<int> transactions)
 
 === File: ./src/transaction/TransactionManager.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-12-05 20:25:29
+ * @ Modified time: 2024-12-05 21:32:36
+ */
+
 #include "TransactionManager.h"
 #include "CommandParser.h"
 #include <iostream>
@@ -1031,6 +1138,12 @@ namespace
 
 void TransactionManager::beginTransaction(const string &transactionName, bool isReadOnly)
 {
+    if (transactions.find(transactionName) != transactions.end())
+    {
+        cout << "Transaction " << transactionName << " already exists.\n";
+        return;
+    }
+
     auto transaction = make_shared<Transaction>(transactionName, isReadOnly);
     transactions[transactionName] = transaction;
     cout << "Transaction " << transactionName << " started"
@@ -1062,14 +1175,17 @@ void TransactionManager::read(const string &transactionName, const string &varia
         cout << variableName << ": " << value << endl;
         readTable[variableName].insert(transaction->getName());
     }
-    catch (const exception &e)
+    catch (const runtime_error &e)
     {
-        cout << "Read failed for transaction " << transactionName
-             << " on variable " << variableName << ": " << e.what() << endl;
+        string errorMsg = e.what();
+        if (errorMsg == "Transaction must wait")
+        {
+            return; // Don't abort - transaction is waiting
+        }
+        // For any other error, abort the transaction
         abortTransaction(transaction);
     }
 }
-
 void TransactionManager::write(const string &transactionName, const string &variableName, int value)
 {
     auto it = transactions.find(transactionName);
@@ -1154,37 +1270,37 @@ void TransactionManager::endTransaction(const string &transactionName)
     validateAndCommit(transaction);
 
     // Clean up transaction entry
-    transactions.erase(it);
+    // transactions.erase(it);
 }
 
-void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
+void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transaction)
 {
-    // first checking if the transaction is readonly
     if (transaction->isReadOnly())
     {
+        // Read-only transactions can commit without checks
         transaction->setStatus(TransactionStatus::COMMITTED);
-        cout << transaction->getName() << " committed (Read-Only)." << endl;
+        std::cout << transaction->getName() << " committed (Read-Only)." << std::endl;
         return;
     }
 
     long transactionStartTime = transaction->getStartTime();
     long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
 
-    // Check if any sites the transaction wrote to have failed
+    // Check if any site written by this transaction failed during its lifetime
     for (int siteId : transaction->getSitesWrittenTo())
     {
         auto site = dataManager->getSite(siteId);
         if (site)
         {
             const auto &failureTimes = site->getFailureTimes();
-            for (const auto &[failTime, recoverTime] : failureTimes)
+            for (auto &ft : failureTimes)
             {
-                // If the site failed after the transaction started and before it committed
-                // and the failure interval overlaps with the transaction's lifetime
+                long failTime = ft.first;
+                long recoverTime = ft.second;
                 if (failTime <= transactionCommitTime &&
                     (recoverTime == -1 || recoverTime >= transactionStartTime))
                 {
-                    cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
+                    std::cout << transaction->getName() << " aborts due to failure of site " << siteId << std::endl;
                     abortTransaction(transaction);
                     return;
                 }
@@ -1192,66 +1308,64 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         }
     }
 
-    // Check write-write conflicts (first-committer wins)
-    bool hasConflict = false;
-    const auto &writeSet = transaction->getWriteSet();
-    long startTime = transaction->getStartTime();
-
-    for (auto it = writeSet.begin(); it != writeSet.end(); ++it)
+    // First committer wins for write-write conflicts
+    for (const auto &writePair : transaction->getWriteSet())
     {
-        const string &variableName = it->first;
-        if (dataManager->hasCommittedWrite(variableName, startTime))
+        const std::string &variableName = writePair.first;
+        if (lastWriter.find(variableName) != lastWriter.end() &&
+            lastWriter[variableName] != transaction->getName())
         {
-            cout << "Write-write conflict detected on " << variableName
-                 << " for transaction " << transaction->getName() << endl;
-            hasConflict = true;
-            break;
+            std::cout << transaction->getName() << " aborts due to first committer wins on " << variableName << std::endl;
+            abortTransaction(transaction);
+            return;
         }
     }
 
-    if (hasConflict)
-    {
-        abortTransaction(transaction);
-        return;
-    }
-
-    // Update readTable and writeTable
+    // ---------------------------------------------------------------------------
+    // Add Dependencies for RW Conflicts - BOTH Directions
+    //
+    // 1) For each variable read by this transaction, add an edge from all writers
+    //    of that variable to this transaction. (Writer → Reader)
     for (const auto &variableName : transaction->getReadSet())
     {
-        readTable[variableName].insert(transaction->getName());
-    }
-
-    for (const auto &[variableName, value] : transaction->getWriteSet())
-    {
-        // For each reader of this variable, add a dependency
-        for (const auto &readerTransactionName : readTable[variableName])
-        {
-            if (readerTransactionName != transaction->getName())
-            {
-                auto readerTransaction = transactions[readerTransactionName];
-                readerTransaction->addDependency(transaction->getName());
-            }
-        }
-        writeTable[variableName].insert(transaction->getName());
-    }
-
-    // For variables read by this transaction, check for write dependencies
-    for (const auto &variableName : transaction->getReadSet())
-    {
+        // All transactions that wrote this variable in the past
         for (const auto &writerTransactionName : writeTable[variableName])
         {
             if (writerTransactionName != transaction->getName())
             {
-                auto writerTransaction = transactions[writerTransactionName];
-                if (writerTransaction->getCommitTime() == 0 || writerTransaction->getCommitTime() > transaction->getStartTime())
-                {
-                    transaction->addDependency(writerTransactionName);
-                }
+                transaction->addDependency(writerTransactionName);
             }
         }
     }
 
-    // Detect cycles
+    // 2) For each variable written by this transaction, add an edge from every reader
+    //    that read this variable (before this write) to the current transaction.
+    //    (Reader → Writer)
+    for (const auto &[variableName, value] : transaction->getWriteSet())
+    {
+        // If there was a previous writer, add that dependency as well (WW dependency)
+        if (lastWriter.find(variableName) != lastWriter.end())
+        {
+            const std::string &prevWriter = lastWriter[variableName];
+            if (prevWriter != transaction->getName())
+            {
+                transaction->addDependency(prevWriter);
+            }
+        }
+
+        // Now handle Reader → Writer edges: all transactions that previously read this variable
+        // must come before this transaction.
+        for (const auto &readerTransactionName : readTable[variableName])
+        {
+            if (readerTransactionName != transaction->getName())
+            {
+                transaction->addDependency(readerTransactionName);
+            }
+        }
+    }
+    // ---------------------------------------------------------------------------
+
+    // Check for cycles in the dependency graph
     if (detectCycle(transaction->getName()))
     {
         std::cout << transaction->getName() << " aborts due to cycle in dependency graph." << std::endl;
@@ -1259,15 +1373,28 @@ void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
         return;
     }
 
-    // If no conflicts, commit the transaction
-    long commitTime = chrono::system_clock::now().time_since_epoch().count();
+    // If no conflicts or cycles, commit
+    long commitTime = std::chrono::system_clock::now().time_since_epoch().count();
     transaction->setCommitTime(commitTime);
 
-    // Write all buffered writes to database
+    // Perform the actual database writes
     dataManager->commitTransaction(transaction);
 
+    // Update lastWriter for all variables written by this transaction
+    for (const auto &[variableName, val] : transaction->getWriteSet())
+    {
+        lastWriter[variableName] = transaction->getName();
+        writeTable[variableName].insert(transaction->getName());
+    }
+
+    // Update readTable for variables read
+    for (const auto &variableName : transaction->getReadSet())
+    {
+        readTable[variableName].insert(transaction->getName());
+    }
+
     transaction->setStatus(TransactionStatus::COMMITTED);
-    cout << transaction->getName() << " committed." << endl;
+    std::cout << transaction->getName() << " committed." << std::endl;
 }
 
 void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction)
@@ -1284,13 +1411,11 @@ void TransactionManager::dump() const
 void TransactionManager::failSite(int siteId)
 {
     dataManager->failSite(siteId);
-    cout << "Site " << siteId << " failed.\n";
 }
 
 void TransactionManager::recoverSite(int siteId)
 {
     dataManager->recoverSite(siteId);
-    cout << "Site " << siteId << " recovered.\n";
 }
 
 bool TransactionManager::detectCycle(const std::string &transactionName)
@@ -1330,6 +1455,13 @@ bool TransactionManager::dfs(const std::string &transactionName, std::set<std::s
 
 === File: ./src/transaction/Transaction.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-28 21:40:54
+ * @ Modified time: 2024-12-05 21:32:47
+ */
+
 #include "Transaction.h"
 
 #include <chrono>
@@ -1397,6 +1529,13 @@ const std::set<std::string> &Transaction::getDependencies() const
 
 === File: ./src/transaction/CommandParser.cpp ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:32:51
+ */
+
 #include "CommandParser.h"
 #include "TransactionManager.h"
 #include <sstream>
@@ -1580,6 +1719,13 @@ echo "Contents have been saved to $OUTPUT_FILE"
 
 === File: ./include/CommandParser.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:27
+ */
+
 #ifndef COMMAND_PARSER_H
 #define COMMAND_PARSER_H
 
@@ -1604,6 +1750,13 @@ private:
 
 === File: ./include/Transaction.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-28 21:40:54
+ * @ Modified time: 2024-12-05 21:33:14
+ */
+
 #ifndef TRANSACTION_H
 #define TRANSACTION_H
 
@@ -1665,6 +1818,13 @@ private:
 
 === File: ./include/TransactionManager.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-28 21:40:54
+ * @ Modified time: 2024-12-05 21:33:11
+ */
+
 #ifndef TRANSACTION_MANAGER_H
 #define TRANSACTION_MANAGER_H
 
@@ -1695,6 +1855,8 @@ private:
     std::map<std::string, std::set<std::string>> readTable; // variableName -> transactions that read it
     std::map<std::string, std::set<std::string>> writeTable;
 
+    std::map<std::string, std::string> lastWriter;
+
     // Helper methods
     void validateAndCommit(std::shared_ptr<Transaction> transaction);
     void abortTransaction(std::shared_ptr<Transaction> transaction);
@@ -1709,6 +1871,13 @@ private:
 
 === File: ./include/DataManager.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:24
+ */
+
 #ifndef DATA_MANAGER_H
 #define DATA_MANAGER_H
 
@@ -1717,10 +1886,9 @@ private:
 #include <vector>
 #include <memory>
 #include "Site.h"
-#include "Transaction.h" // Added this include
+#include "Transaction.h"
 
-class DataManager
-{
+class DataManager {
 public:
     DataManager();
     void initializeSites();
@@ -1728,15 +1896,13 @@ public:
     std::shared_ptr<Site> getSite(int siteId);
     std::vector<std::shared_ptr<Site>> getAllSites();
 
-    // Added these new method declarations
-    bool hasCommittedWrite(const std::string &variableName, long startTime);
+    bool hasCommittedWrite(const std::string& variableName, long startTime);
     void commitTransaction(std::shared_ptr<Transaction> transaction);
     void dump();
 
     // Methods to route read/write requests to sites
-    int read(const std::string &transactionName, const std::string &variableName, long timestamp);
-    void write(std::shared_ptr<Transaction> transaction, const std::string &variableName, int value, long commitTime);
-    // Pass ptr to track transaction sites
+    int read(const std::string& transactionName, const std::string& variableName, long timestamp);
+    void write(std::shared_ptr<Transaction> transaction, const std::string& variableName, int value, long commitTime);
 
     // Methods to handle site failures and recoveries
     void failSite(int siteId);
@@ -1744,6 +1910,18 @@ public:
 
 private:
     std::map<int, std::shared_ptr<Site>> sites;
+    
+    // Structure to track waiting transactions
+    struct WaitingRead {
+        std::string transactionName;
+        std::string variableName;
+        long timestamp;
+    };
+    std::vector<WaitingRead> waitingReads;
+
+    // Helper method to check if a site has stable history
+    bool hasSiteStableHistory(std::shared_ptr<Site> site, long timestamp) const;
+    bool hasContinuousHistory(std::shared_ptr<Site> site, long fromTime, long toTime) const;
 };
 
 #endif // DATA_MANAGER_H
@@ -1751,6 +1929,13 @@ private:
 
 === File: ./include/Variable.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:07
+ */
+
 #ifndef VARIABLE_H
 #define VARIABLE_H
 
@@ -1783,6 +1968,13 @@ private:
 
 === File: ./include/Lock.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:19
+ */
+
 #ifndef LOCK_H
 #define LOCK_H
 
@@ -1814,6 +2006,13 @@ public:
 
 === File: ./include/Site.h ===
 ----------------------------------------
+/**
+ * @ Author: Ke Wang & Siwen Tao
+ * @ Email: kw3484@nyu.edu & st5297@nyu.edu
+ * @ Create Time: 2024-11-26 20:07:56
+ * @ Modified time: 2024-12-05 21:33:17
+ */
+
 #ifndef SITE_H
 #define SITE_H
 

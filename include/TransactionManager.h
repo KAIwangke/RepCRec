@@ -35,6 +35,8 @@ private:
     std::map<std::string, std::set<std::string>> readTable; // variableName -> transactions that read it
     std::map<std::string, std::set<std::string>> writeTable;
 
+    std::map<std::string, std::string> lastWriter;
+
     // Helper methods
     void validateAndCommit(std::shared_ptr<Transaction> transaction);
     void abortTransaction(std::shared_ptr<Transaction> transaction);
