@@ -30,6 +30,32 @@ A C++ implementation of a distributed database system with replicated concurrenc
 ## Build Instructions
 
 ### Prerequisites
+```
+RepCRec/
+├── build/              # Created during compilation
+├── include/            # Header files
+│   ├── CommandParser.h
+│   ├── DataManager.h
+│   ├── Lock.h
+│   ├── Site.h
+│   ├── Transaction.h
+│   ├── TransactionManager.h
+│   └── Variable.h
+├── src/               # Source files
+│   ├── data/
+│   │   ├── DataManager.cpp
+│   │   ├── Site.cpp
+│   │   └── Variable.cpp
+│   ├── transaction/
+│   │   ├── CommandParser.cpp
+│   │   ├── Transaction.cpp
+│   │   └── TransactionManager.cpp
+│   └── main.cpp
+├── test/              # Test input files
+├── test_std/          # Expected test outputs
+└── CMakeLists.txt
+```
+
 - CMake (version 3.10 or higher)
 - C++11 compatible compiler
 - Make
