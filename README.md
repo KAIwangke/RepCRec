@@ -49,6 +49,20 @@ make
 ./RepCRec                    # Interactive mode
 ./RepCRec input_file.txt     # File input mode
 ```
+or
+```bash
+make test01                    # cmake single test
+make test02                    # cmake single test
+make test03_5                    # cmake single test
+```
+
+
+### Testing
+The project includes a comprehensive test suite in the `test` directory. Run tests using:
+```bash
+make test        # Run all tests
+make diff_all    # Compare test outputs with expected results
+```
 
 ### Supported Commands
 - `begin(T1)` - Start transaction T1
@@ -91,13 +105,6 @@ dump()
 - Tracks commit timestamps for each version
 - Supports consistent reads based on transaction start time
 - Handles replicated and non-replicated variables
-
-## Testing
-The project includes a comprehensive test suite in the `test` directory. Run tests using:
-```bash
-make test        # Run all tests
-make diff_all    # Compare test outputs with expected results
-```
 
 ## Authors
 - Ke Wang (kw3484@nyu.edu)
