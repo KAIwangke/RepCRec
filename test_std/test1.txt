@@ -1,0 +1,30 @@
+Transaction T1 started.
+Transaction T2 started.
+Write of 101 to x1 buffered for transaction T1
+Write of 202 to x2 buffered for transaction T2
+Write of 102 to x2 buffered for transaction T1
+Write of 201 to x1 buffered for transaction T2
+T2 committed.
+Write-write conflict detected on x1 for transaction T1
+Transaction T1 aborted.
+=== Site 1 ===
+x2: 202 at all sites
+=== Site 2 ===
+x1: 201
+x2: 202 at all sites
+=== Site 3 ===
+x2: 202 at all sites
+=== Site 4 ===
+x2: 202 at all sites
+=== Site 5 ===
+x2: 202 at all sites
+=== Site 6 ===
+x2: 202 at all sites
+=== Site 7 ===
+x2: 202 at all sites
+=== Site 8 ===
+x2: 202 at all sites
+=== Site 9 ===
+x2: 202 at all sites
+=== Site 10 ===
+x2: 202 at all sites

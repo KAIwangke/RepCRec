@@ -1,0 +1,31 @@
+Transaction T1 started.
+Transaction T2 started.
+Site 3 failed.
+Site 4 failed.
+x1: 10
+Write of 88 to x8 buffered for transaction T2
+T1 committed.
+Site 4 recovered.
+Site 3 recovered.
+x3: 30
+T2 committed.
+=== Site 1 ===
+x8: 88 at all sites
+=== Site 2 ===
+x8: 88 at all sites
+=== Site 3 ===
+All variables have their initial values
+=== Site 4 ===
+All variables have their initial values
+=== Site 5 ===
+x8: 88 at all sites
+=== Site 6 ===
+x8: 88 at all sites
+=== Site 7 ===
+x8: 88 at all sites
+=== Site 8 ===
+x8: 88 at all sites
+=== Site 9 ===
+x8: 88 at all sites
+=== Site 10 ===
+x8: 88 at all sites

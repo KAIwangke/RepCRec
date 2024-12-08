@@ -1,10 +1,3 @@
-/**
- * @ Author: Ke Wang & Siwen Tao
- * @ Email: kw3484@nyu.edu & st5297@nyu.edu
- * @ Create Time: 2024-12-05 20:25:29
- * @ Modified time: 2024-12-05 21:32:36
- */
-
 #include "TransactionManager.h"
 #include "CommandParser.h"
 #include <iostream>
@@ -46,37 +39,31 @@ void TransactionManager::beginTransaction(const string &transactionName, bool is
          << (isReadOnly ? " (Read-Only)" : "") << ".\n";
 }
 
-void TransactionManager::read(const string &transactionName, const string &variableName)
-{
+void TransactionManager::read(const string& transactionName, const string& variableName) {
     auto it = transactions.find(transactionName);
-    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE)
-    {
+    if (it == transactions.end() || it->second->getStatus() != TransactionStatus::ACTIVE) {
         cout << "Transaction " << transactionName << " is not active.\n";
         return;
     }
 
     auto transaction = it->second;
     int varIndex = getVarIndex(variableName);
-    if (varIndex < 1 || varIndex > 20)
-    {
+    if (varIndex < 1 || varIndex > 20) {
         cout << "Invalid variable name: " << variableName << endl;
         abortTransaction(transaction);
         return;
     }
 
-    try
-    {
+    try {
         int value = dataManager->read(transactionName, variableName, transaction->getStartTime());
         transaction->addReadVariable(variableName);
         cout << variableName << ": " << value << endl;
         readTable[variableName].insert(transaction->getName());
     }
-    catch (const runtime_error &e)
-    {
+    catch (const runtime_error& e) {
         string errorMsg = e.what();
-        if (errorMsg == "Transaction must wait")
-        {
-            return; // Don't abort - transaction is waiting
+        if (errorMsg == "Transaction must wait") {
+            return;  // Don't abort - transaction is waiting
         }
         // For any other error, abort the transaction
         abortTransaction(transaction);
@@ -169,34 +156,34 @@ void TransactionManager::endTransaction(const string &transactionName)
     // transactions.erase(it);
 }
 
-void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transaction)
+void TransactionManager::validateAndCommit(shared_ptr<Transaction> transaction)
 {
+    // first checking if the transaction is readonly
     if (transaction->isReadOnly())
     {
-        // Read-only transactions can commit without checks
         transaction->setStatus(TransactionStatus::COMMITTED);
-        std::cout << transaction->getName() << " committed (Read-Only)." << std::endl;
+        cout << transaction->getName() << " committed (Read-Only)." << endl;
         return;
     }
 
     long transactionStartTime = transaction->getStartTime();
     long transactionCommitTime = std::chrono::system_clock::now().time_since_epoch().count();
 
-    // Check if any site written by this transaction failed during its lifetime
+    // Check if any sites the transaction wrote to have failed
     for (int siteId : transaction->getSitesWrittenTo())
     {
         auto site = dataManager->getSite(siteId);
         if (site)
         {
             const auto &failureTimes = site->getFailureTimes();
-            for (auto &ft : failureTimes)
+            for (const auto &[failTime, recoverTime] : failureTimes)
             {
-                long failTime = ft.first;
-                long recoverTime = ft.second;
+                // If the site failed after the transaction started and before it committed
+                // and the failure interval overlaps with the transaction's lifetime
                 if (failTime <= transactionCommitTime &&
                     (recoverTime == -1 || recoverTime >= transactionStartTime))
                 {
-                    std::cout << transaction->getName() << " aborts due to failure of site " << siteId << std::endl;
+                    cout << transaction->getName() << " aborts due to failure of site " << siteId << endl;
                     abortTransaction(transaction);
                     return;
                 }
@@ -204,64 +191,66 @@ void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transact
         }
     }
 
-    // First committer wins for write-write conflicts
-    for (const auto &writePair : transaction->getWriteSet())
+    // Check write-write conflicts (first-committer wins)
+    bool hasConflict = false;
+    const auto &writeSet = transaction->getWriteSet();
+    long startTime = transaction->getStartTime();
+
+    for (auto it = writeSet.begin(); it != writeSet.end(); ++it)
     {
-        const std::string &variableName = writePair.first;
-        if (lastWriter.find(variableName) != lastWriter.end() &&
-            lastWriter[variableName] != transaction->getName())
+        const string &variableName = it->first;
+        if (dataManager->hasCommittedWrite(variableName, startTime))
         {
-            std::cout << transaction->getName() << " aborts due to first committer wins on " << variableName << std::endl;
-            abortTransaction(transaction);
-            return;
+            cout << "Write-write conflict detected on " << variableName
+                 << " for transaction " << transaction->getName() << endl;
+            hasConflict = true;
+            break;
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Add Dependencies for RW Conflicts - BOTH Directions
-    //
-    // 1) For each variable read by this transaction, add an edge from all writers
-    //    of that variable to this transaction. (Writer → Reader)
+    if (hasConflict)
+    {
+        abortTransaction(transaction);
+        return;
+    }
+
+    // Update readTable and writeTable
     for (const auto &variableName : transaction->getReadSet())
     {
-        // All transactions that wrote this variable in the past
-        for (const auto &writerTransactionName : writeTable[variableName])
-        {
-            if (writerTransactionName != transaction->getName())
-            {
-                transaction->addDependency(writerTransactionName);
-            }
-        }
+        readTable[variableName].insert(transaction->getName());
     }
 
-    // 2) For each variable written by this transaction, add an edge from every reader
-    //    that read this variable (before this write) to the current transaction.
-    //    (Reader → Writer)
     for (const auto &[variableName, value] : transaction->getWriteSet())
     {
-        // If there was a previous writer, add that dependency as well (WW dependency)
-        if (lastWriter.find(variableName) != lastWriter.end())
-        {
-            const std::string &prevWriter = lastWriter[variableName];
-            if (prevWriter != transaction->getName())
-            {
-                transaction->addDependency(prevWriter);
-            }
-        }
-
-        // Now handle Reader → Writer edges: all transactions that previously read this variable
-        // must come before this transaction.
+        // For each reader of this variable, add a dependency
         for (const auto &readerTransactionName : readTable[variableName])
         {
             if (readerTransactionName != transaction->getName())
             {
-                transaction->addDependency(readerTransactionName);
+                auto readerTransaction = transactions[readerTransactionName];
+                readerTransaction->addDependency(transaction->getName());
+            }
+        }
+        writeTable[variableName].insert(transaction->getName());
+    }
+
+    // For variables read by this transaction, check for write dependencies
+    for (const auto &variableName : transaction->getReadSet())
+    {
+        for (const auto &writerTransactionName : writeTable[variableName])
+        {
+            if (writerTransactionName != transaction->getName())
+            {
+                auto writerTransaction = transactions[writerTransactionName];
+                if (writerTransaction->getCommitTime() == 0 || writerTransaction->getCommitTime() > transaction->getStartTime())
+                {
+                    transaction->addDependency(writerTransactionName);
+                }
             }
         }
     }
-    // ---------------------------------------------------------------------------
 
-    // Check for cycles in the dependency graph
+    // Detect cycles
     if (detectCycle(transaction->getName()))
     {
         std::cout << transaction->getName() << " aborts due to cycle in dependency graph." << std::endl;
@@ -269,28 +258,15 @@ void TransactionManager::validateAndCommit(std::shared_ptr<Transaction> transact
         return;
     }
 
-    // If no conflicts or cycles, commit
-    long commitTime = std::chrono::system_clock::now().time_since_epoch().count();
+    // If no conflicts, commit the transaction
+    long commitTime = chrono::system_clock::now().time_since_epoch().count();
     transaction->setCommitTime(commitTime);
 
-    // Perform the actual database writes
+    // Write all buffered writes to database
     dataManager->commitTransaction(transaction);
 
-    // Update lastWriter for all variables written by this transaction
-    for (const auto &[variableName, val] : transaction->getWriteSet())
-    {
-        lastWriter[variableName] = transaction->getName();
-        writeTable[variableName].insert(transaction->getName());
-    }
-
-    // Update readTable for variables read
-    for (const auto &variableName : transaction->getReadSet())
-    {
-        readTable[variableName].insert(transaction->getName());
-    }
-
     transaction->setStatus(TransactionStatus::COMMITTED);
-    std::cout << transaction->getName() << " committed." << std::endl;
+    cout << transaction->getName() << " committed." << endl;
 }
 
 void TransactionManager::abortTransaction(shared_ptr<Transaction> transaction)

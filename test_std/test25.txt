@@ -1,0 +1,27 @@
+Transaction T1 started.
+Transaction T2 started.
+Site 3 failed.
+Site 4 failed.
+x1: 10
+Write of 88 to x8 buffered for transaction T2
+T1 committed.
+Site 4 recovered.
+Site 3 recovered.
+x3: 30
+T2 committed.
+Site 1 failed.
+Site 5 failed.
+Site 6 failed.
+Site 7 failed.
+Site 8 failed.
+Site 9 failed.
+Site 10 failed.
+Transaction T3 started.
+Site 2 failed.
+Transaction T4 started.
+Write of 99 to x8 buffered for transaction T4
+T4 committed.
+Transaction T3 waits for reading x8
+Site 2 recovered.
+x8: 88
+T3 committed.

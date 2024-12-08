@@ -1,0 +1,21 @@
+Transaction T5 started.
+Transaction T4 started.
+Transaction T3 started.
+Transaction T2 started.
+Transaction T1 started.
+Write of 5 to x4 buffered for transaction T1
+Site 2 failed.
+Write of 44 to x4 buffered for transaction T2
+Site 2 recovered.
+Write of 55 to x4 buffered for transaction T3
+Write of 66 to x4 buffered for transaction T4
+Write of 77 to x4 buffered for transaction T5
+T1 aborts due to failure of site 2
+Transaction T1 aborted.
+T2 committed.
+Write-write conflict detected on x4 for transaction T3
+Transaction T3 aborted.
+Write-write conflict detected on x4 for transaction T4
+Transaction T4 aborted.
+Write-write conflict detected on x4 for transaction T5
+Transaction T5 aborted.

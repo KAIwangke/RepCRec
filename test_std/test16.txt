@@ -1,0 +1,10 @@
+Transaction T3 started.
+Transaction T2 started.
+Write of 22 to x2 buffered for transaction T3
+Write of 44 to x4 buffered for transaction T2
+x4: 40
+T2 committed.
+T3 committed.
+Transaction T1 started.
+x2: 22
+T1 committed.

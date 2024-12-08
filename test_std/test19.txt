@@ -1,0 +1,23 @@
+Transaction T1 started.
+Transaction T2 started.
+Transaction T3 started.
+Transaction T4 started.
+Transaction T5 started.
+Write of 300 to x3 buffered for transaction T3
+Site 4 failed.
+Site 4 recovered.
+x4: 40
+x5: 50
+x6: 60
+x2: 20
+Write of 10 to x2 buffered for transaction T1
+Write of 20 to x3 buffered for transaction T2
+Write of 30 to x4 buffered for transaction T3
+Write of 50 to x1 buffered for transaction T5
+T5 committed.
+Write of 40 to x5 buffered for transaction T4
+T4 committed.
+T3 aborts due to failure of site 4
+Transaction T3 aborted.
+T2 committed.
+T1 committed.

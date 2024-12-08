@@ -1,0 +1,21 @@
+Transaction T1 started.
+Transaction T2 started.
+Transaction T3 started.
+Transaction T4 started.
+Transaction T5 started.
+x4: 40
+x5: 50
+x1: 10
+Write of 10 to x2 buffered for transaction T1
+x2: 20
+Write of 20 to x3 buffered for transaction T2
+x3: 30
+Write of 30 to x4 buffered for transaction T3
+Write of 40 to x5 buffered for transaction T4
+Write of 50 to x1 buffered for transaction T5
+T4 committed.
+T3 committed.
+T2 committed.
+T1 committed.
+T5 aborts due to cycle in dependency graph.
+Transaction T5 aborted.

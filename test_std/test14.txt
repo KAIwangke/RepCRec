@@ -1,0 +1,11 @@
+Transaction T1 started.
+Transaction T2 started.
+Transaction T3 started.
+Write of 10 to x2 buffered for transaction T3
+Write of 20 to x2 buffered for transaction T1
+Write of 30 to x2 buffered for transaction T2
+T1 committed.
+Write-write conflict detected on x2 for transaction T3
+Transaction T3 aborted.
+Write-write conflict detected on x2 for transaction T2
+Transaction T2 aborted.

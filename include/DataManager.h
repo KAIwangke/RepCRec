@@ -1,10 +1,3 @@
-/**
- * @ Author: Ke Wang & Siwen Tao
- * @ Email: kw3484@nyu.edu & st5297@nyu.edu
- * @ Create Time: 2024-11-26 20:07:56
- * @ Modified time: 2024-12-05 21:33:24
- */
-
 #ifndef DATA_MANAGER_H
 #define DATA_MANAGER_H
 

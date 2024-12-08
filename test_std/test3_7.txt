@@ -1,0 +1,11 @@
+Transaction T1 started.
+Transaction T2 started.
+x3: 30
+Write of 88 to x8 buffered for transaction T2
+Site 2 failed.
+x3: 30
+Site 2 recovered.
+Write of 91 to x4 buffered for transaction T1
+T2 aborts due to failure of site 2
+Transaction T2 aborted.
+T1 committed.
